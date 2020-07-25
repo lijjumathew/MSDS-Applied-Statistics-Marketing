@@ -1,0 +1,493 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load libraries
+```{r}
+library(GGally)
+library(scales)
+library(leaps)
+library(lme4)
+library(mlbench)
+library(caret)
+library(MASS)
+library(randomForest)
+library(arm)
+library(glmnet)
+library(imputeMissings)
+library(ggvis)
+library(mice)
+library(ISLR)
+library(plyr)
+library(dplyr)
+library(ISOweek)
+library(corrplot)
+library(PerformanceAnalytics)
+library(psych)
+library(psychTools)
+library(mda)
+library(klaR)
+library(aod)
+library(ggfortify)
+library(factoextra)
+library(rgl)
+library(tree)
+library(randomForest)
+library(ridge)
+```
+
+## Load in dataset and look at data
+```{r}
+# import data
+datain <- read.csv("D:/MS Data Science/SMU/6372 - Applied Stats/Project 2/bank-additional-full.csv", header = TRUE)
+
+# View data
+str(datain)
+summary(datain)
+
+# convert to dataframe
+datain <- as.data.frame(datain)
+
+# Convert all "unknown" to NA
+datain[datain == "unknown"] <- NA
+
+# Count NA values in each column
+na_count <-sapply(datain, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+
+# Count number of yes and no
+y_count <-sapply(datain, function(y) sum(length(which(y=="yes"))))
+y_count <- data.frame(y_count)
+y_count
+
+n_count <-sapply(datain, function(y) sum(length(which(y=="no"))))
+n_count <- data.frame(n_count)
+n_count
+
+# there are 36,548 No's and 4,640 Yes's.
+# This will need to be accounted for in the train/test set.
+```
+
+## Impute missing data & convert to numeric
+```{r}
+# convert to factor for imputation
+datain$job <- as.factor(datain$job)
+datain$marital <- as.factor(datain$marital)
+datain$education <- as.factor(datain$education)
+datain$default <- as.factor(datain$default)
+datain$housing <- as.factor(datain$housing)
+datain$loan <- as.factor(datain$loan)
+datain$contact <- as.factor(datain$contact)
+datain$month <- sapply(datain$month,function(x) grep(paste("(?i)",x,sep=""),month.abb))
+datain$day_of_week <- recode(datain$day_of_week, 
+       "mon"="1",
+       "tue"="2",
+       "wed"="3",
+       "thu"="4",
+       "fri"="5",
+       "sat"="6",
+       "sun"="7")
+datain$day_of_week <- as.factor(datain$day_of_week)
+datain$poutcome <- as.factor(datain$poutcome)
+
+# setting up parms
+init = mice(datain, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+# impute the following columns
+meth[c("job", "marital","education","default","housing", "loan")]="polyreg"
+
+# impuate & new dataset
+set.seed(123)
+imputed = mice(datain, method=meth, predictorMatrix=predM, m=1)
+imputed <- complete(imputed)
+sapply(imputed, function(x) sum(is.na(x)))
+
+# convert to numeric
+imputed$job <- as.numeric(imputed$job)
+imputed$marital <- as.numeric(imputed$marital)
+imputed$education <- as.numeric(imputed$education)
+imputed$default <- as.numeric(imputed$default)
+imputed$housing <- as.numeric(imputed$housing)
+imputed$loan <- as.numeric(imputed$loan)
+imputed$contact <- as.numeric(imputed$contact)
+imputed$poutcome <- as.numeric(imputed$poutcome)
+```
+
+## Simple linear model PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+simple.lr <- imputed
+
+simple.lr$y <- as.numeric(as.factor(simple.lr$y))
+
+simple.lm = lm(y~., data = simple.lr)
+summary(simple.lm)
+
+# AIC & BIC
+AIC(simple.lm)  # AIC => 6950.094
+BIC(simple.lm)  # BIC => 7133.246
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.lr), 0.7*nrow(simple.lr))  # row indices for training data
+simple.train <- simple.lr[simple.index, ]  # model training data
+simple.test  <- simple.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.lm <- lm(y~., data=simple.train)  # build the model
+simple.pred <- predict(simple.lm, simple.test)  # predict y
+
+# Summary
+summary(simple.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.test$y, predicteds=simple.pred))  # make actuals_predicteds dataframe
+actuals_preds$predicteds <- round(actuals_preds$predicteds)
+correlation_accuracy <- cor(actuals_preds)  # 42.8%
+correlation_accuracy
+```
+
+## Ridge Regression model PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+ridge.lr <- imputed
+
+ridge.lr$y <- as.numeric(as.factor(ridge.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.lr), 0.7*nrow(ridge.lr)) # indices for 80% training data
+ridge.train <- ridge.lr[ridge.Index, ] # training data
+ridge.test <- ridge.lr[-ridge.Index, ] # test data
+
+ridge.model <- linearRidge(y ~ ., data = ridge.train)  # the ridge regression model
+summary(ridge.model)
+
+ridge.pred <- predict(ridge.model, ridge.test)  # predict on test data
+ridge.compare <- cbind (actual=ridge.test$y, ridge.pred)  # combine
+
+mean (apply(ridge.compare, 1, min)/apply(ridge.compare, 1, max)) # calculate accuracy
+# 89.59%
+```
+
+## LASSO Regression model PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+lasso.lr <- imputed
+
+lasso.lr$y <- as.numeric(as.factor(lasso.lr$y))
+
+lasso.train = lasso.lr %>% sample_frac(0.5)
+
+lasso.test = lasso.lr %>% setdiff(lasso.train)
+
+lasso.x_train = model.matrix(y~., lasso.train)[,-1]
+lasso.x_test = model.matrix(y~., lasso.test)[,-1]
+
+lasso.y_train = lasso.train %>%
+  select(y) %>%
+  unlist() %>%
+  as.numeric()
+
+lasso.y_test = lasso.test %>%
+  select(y) %>%
+  unlist() %>%
+  as.numeric()
+
+lasso_mod = glmnet(lasso.x_train, 
+                   lasso.y_train, 
+                   alpha = 1, 
+                   lambda = grid) # Fit lasso model on training data
+
+plot(lasso_mod)    # Draw plot of coefficients
+
+cv.out = cv.glmnet(lasso.x_train, lasso.y_train, alpha = 1) # Fit lasso model on training data
+plot(cv.out) # Draw plot of training MSE as a function of lambda
+bestlam = cv.out$lambda.min # Select lamda that minimizes training MSE
+lasso_pred = predict(lasso_mod, s = bestlam, newx = lasso.x_test) # Use best lambda to predict test data
+mean((lasso_pred - lasso.y_test)^2) # Calculate test MSE
+
+out = glmnet(x, y, alpha = 1, lambda = grid) # Fit lasso model on full dataset
+lasso_coef = predict(out, type = "coefficients", s = bestlam)[1:20,] # Display coefficients using lambda chosen by CV
+lasso_coef
+
+lasso_coef[lasso_coef != 0] # Display only non-zero coefficients
+
+```
+
+## Elastic Net model PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+EN.lr <- imputed
+
+EN.lr$y <- as.numeric(as.factor(EN.lr$y))
+
+EN.train = EN.lr %>% sample_frac(0.5)
+
+EN.test = EN.lr %>% setdiff(EN.train)
+
+EN.x_train = model.matrix(y~., EN.train)[,-1]
+EN.x_test = model.matrix(y~., EN.test)[,-1]
+
+
+# Set training control
+EN.train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(y ~ .,
+                           data = EN.train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = EN.train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+
+# Coefficients
+coef(elastic_reg$finalModel, elastic_reg$bestTune$lambda)
+
+# Make predictions on the test data
+EN.predictions <- elastic_reg %>% predict(EN.test)
+# Model performance metrics
+data.frame(
+  RMSE = RMSE(EN.predictions, EN.test$y),
+  Rsquare = R2(EN.predictions, EN.test$y)
+)
+```
+
+## StepWise model PRIOR to EDA. For comparison.
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+stepwise <- imputed
+
+stepwise$y <- as.numeric(as.factor(stepwise$y))
+
+# Set up repeated k-fold cross-validation
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+step.model <- train(y ~., data = stepwise,
+                    method = "leapBackward", 
+                    tuneGrid = data.frame(nvmax = 1:5),
+                    trControl = train.control
+                    )
+step.model$results
+step.model$bestTune
+summary(step.model$finalModel)
+coef(step.model$finalModel, 5)
+```
+
+## Logit modeling with PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+imputed$y <- as.factor(imputed$y)
+logit.model <- glm(y~., data = imputed, family = "binomial")
+summary(logit.model)
+confint(logit.model)
+
+# Test & train
+trainIndex <- createDataPartition(datain$y, p = .67,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.Train <- imputed[ trainIndex,]
+logit.Test  <- imputed[-trainIndex,]
+
+model1 <- glm(y~., data = logit.Train, family=binomial)
+summary(model1)
+
+logit.Test$model_prob <- predict(model1, logit.Test, type = "response")
+
+logit.Test <- logit.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
+                                 bin1 = 1*(y == "Yes") + 0)
+
+logit.Test <- logit.Test %>% mutate(accurate = 1*(model_pred == bin1))
+sum(logit.Test$accurate)/nrow(logit.Test)
+```
+
+## PCA modeling with PRIOR to EDA. For comparison.
+```{r}
+pca.data <- imputed[, 1:20]
+pca.model <- prcomp(pca.data, scale = TRUE)
+
+eig.val <- get_eigenvalue(pca.model)
+eig.val
+
+# Results for Variables
+res.var <- get_pca_var(pca.model)
+res.var$coord          # Coordinates
+res.var$contrib        # Contributions to the PCs
+res.var$cos2           # Quality of representation 
+
+fviz_eig(pca.model)
+```
+
+## LDA modeling with PRIOR to EDA. For comparison.
+```{r}
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+training.samples <- imputed$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+LDA.train.data <- imputed[training.samples, ]
+LDA.test.data <- imputed[-training.samples, ]
+
+# Estimate preprocessing parameters
+preproc.param <- LDA.train.data %>% 
+  preProcess(method = c("center", "scale"))
+# Transform the data using the estimated parameters
+LDA.train.transformed <- preproc.param %>% predict(LDA.train.data)
+LDA.test.transformed <- preproc.param %>% predict(LDA.test.data)
+
+# Model
+lda.model <- lda(y~., data = LDA.train.transformed)
+lda.model
+
+# Plot results
+plot(lda.model)
+
+# Make predictions
+predictions <- lda.model %>% predict(test.transformed)
+names(predictions)
+
+# Predicted classes
+head(predictions$class, 6)
+# Predicted probabilities of class memebership.
+head(predictions$posterior, 6) 
+# Linear discriminants
+head(predictions$x, 3) 
+
+# Accuracy
+mean(predictions$class==test.transformed$y)
+```
+
+## QDA modeling with PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+QDA.Data <- imputed
+
+QDA.Data$y <- as.numeric(QDA.Data$y)
+
+training.samples <- QDA.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+QDA.train.data <- QDA.Data[training.samples, ]
+QDA.test.data <- QDA.Data[-training.samples, ]
+
+# Fit the model
+qda.model <- qda(y ~ education + contact + day_of_week + duration + pdays + poutcome, data = QDA.train.data)
+qda.model
+
+# Make predictions
+predictions <- qda.model %>% predict(QDA.test.data)
+
+# Model accuracy
+mean(predictions$class == QDA.test.data$y)
+
+```
+
+## MDA modeling with PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+MDA.Data <- imputed
+
+MDA.Data$y <- as.numeric(MDA.Data$y)
+
+training.samples <- MDA.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+MDA.train.data <- MDA.Data[training.samples, ]
+MDA.test.data <- MDA.Data[-training.samples, ]
+
+# Fit the model
+mda.model <- mda(y~., data = MDA.train.data)
+mda.model
+# Make predictions
+predicted.classes <- mda.model %>% predict(MDA.test.data)
+# Model accuracy
+mean(predicted.classes == MDA.test.data$y)
+```
+
+## FDA modeling with PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+FDA.Data <- imputed
+
+FDA.Data$y <- as.numeric(FDA.Data$y)
+
+training.samples <- FDA.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+FDA.train.data <- FDA.Data[training.samples, ]
+FDA.test.data <- FDA.Data[-training.samples, ]
+
+# Fit the model
+fda.model <- fda(y~., data = FDA.train.data)
+# Make predictions
+predicted.classes <- fda.model %>% predict(FDA.test.data)
+# Model accuracy
+mean(predicted.classes == FDA.test.data$y)
+```
+
+## RDA modeling with PRIOR to EDA. For comparison.
+```{r}
+set.seed(123)
+
+RDA.Data <- imputed
+
+RDA.Data$y <- as.numeric(RDA.Data$y)
+
+training.samples <- RDA.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+RDA.train.data <- RDA.Data[training.samples, ]
+RDA.test.data <- RDA.Data[-training.samples, ]
+
+# Fit the model
+rda.model <- rda(y~., data = RDA.train.data)
+# Make predictions
+predictions <- rda.model %>% predict(RDA.test.data)
+# Model accuracy
+mean(predictions$class == RDA.test.data$y)
+```
+
+## Tree modeling with PRIOR to EDA. For comparison. WORK IN PROGESS. DOES NOT FUNCTION YET.
+```{r}
+#Now lets get to a decision tree fit
+#Lets make a simple tree forcing the node sizes to have at least 50 observations
+short.tree<-tree(y~.,data = datain, mincut=50)
+summary(short.tree)
+plot(short.tree)
+text(short.tree)
+
+#View the regions based on the simple tree
+p2<-p1+geom_point(shape=21,size=2.5)+scale_fill_gradient(low='white', high='blue')
+
+p2+geom_hline(yintercept=122.05)+geom_segment(x=26.85,y=122.05,xend=26.85,yend=305)
+
+
+#View the prediction just so we can get a sense of whats going on.
+predictors<-data.frame(TV=rep(0:300,51),radio=rep(0:50,each=301))
+pred.surface<-matrix(predict(short.tree,newdata=predictors),301,51)
+plot3d(TV,radio,sales)
+surface3d(0:300,0:50,pred.surface,alpha=.4)
+
+```
+
