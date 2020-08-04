@@ -1,0 +1,227 @@
+---
+title: "Case Study 2 - Marketing"
+author: "Lijju Mathew"
+date: "7/23/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+install.packages("gdata")
+
+```{r library}
+library(gdata)
+library(tidyverse)
+library(ggplot2)
+library(gplots)
+library(caTools)
+library(dplyr)
+library(magrittr)
+library(readr)
+library(survival)
+library(nlme)
+library(gridExtra) #grid.arrange()
+library(class)
+library(forcats)
+library(MASS)
+library(GGally)
+library(tidyr)
+library(maps)
+library(mapproj)
+library(stringr)
+library(rmarkdown)
+library(knitr)
+library(jsonlite)
+library(RCurl)
+library(class)
+library(httr)
+library(mice)
+library(corrplot)
+library(GoodmanKruskal) 
+library(plyr)
+library(ggpubr)
+```
+
+
+```{r Read Data}
+mktg_raw <- read.table('/Users/lijjumathew/Library/Mobile Documents/com~apple~CloudDocs/Lijju/SMU/Courses/Applied Statistics/Project/Project2/bank-additional-full.csv', na.strings=c("unknown"),sep=";", header=TRUE)
+# mktg_raw <- read.csv(file.choose())
+head(mktg_raw)
+View(mktg_raw)
+summary(mktg_raw)
+str(mktg_raw)
+```
+
+```{r Missing values - unknowns}
+
+# Find the no of attributes with missing values
+sort(sapply(mktg_raw, function(x) sum(is.na(x))), decreasing = T)
+
+#Missing data and percentage plot
+missing.values <- mktg_raw %>%
+  gather(key = "key", value = "val") %>%
+  dplyr::mutate(isna = is.na(val)) %>%
+  dplyr::group_by(key) %>%
+  dplyr::mutate(total = n()) %>%
+  dplyr::group_by(key, total, isna)%>%
+  dplyr::summarise(num.isna = n())%>%
+  dplyr::mutate(pct = num.isna / total * 100)
+
+levels <- (missing.values %>% filter(isna == T) %>% arrange(desc(pct)))$key
+
+percentage.plot <- missing.values %>%
+      ggplot() + geom_bar(aes(x = reorder(key, desc(pct)), y = pct, fill=isna), stat = 'identity', alpha=0.8) +
+      scale_x_discrete(limits = levels) +
+      scale_fill_manual(name = "", values = c('steelblue', 'tomato3'), labels = c("Present", "Missing")) +
+      coord_flip() + 
+      labs(title = "Percentage of missing/unknown values", x = 'Variable', y = "% of missing/unknown values")
+percentage.plot
+
+tempData <- mice(mktg_raw,m=1,maxit=0,meth='fastpmm',seed=500)
+mktg_imp <- complete(tempData,1)
+
+sort(sapply(mktg_imp, function(x) sum(is.na(x))), decreasing = T)
+glimpse(mktg_imp)
+```
+
+```{r split}
+set.seed(1234)
+split_percent = .30
+trainIndices = sample(1:dim(mktg_imp)[1],round(split_percent * dim(mktg_imp)[1]))
+train = mktg_imp[trainIndices,]
+test = mktg_imp[-trainIndices,]
+```
+
+```{r EDA - Box plots, Scatter plots, Correlation plots}
+
+summary(mktg_raw)
+summary(mktg_imp)
+mktg_imp_conti <- mktg_imp[, !sapply(mktg_imp, is.factor)]
+mktg_imp_categ <- mktg_imp[, sapply(mktg_imp, is.factor)]
+
+# Box plots to find outliers
+boxplot(mktg_imp_conti)
+ggplot(stack(mktg_imp_conti),aes(x = ind, y = values) ) + geom_boxplot()
+boxplot(mktg_imp_conti$age)
+boxplot(mktg_imp_conti$pdays)
+
+# Pdays is number of days passed after client was last contacted from previous campaign.
+# Value of 999 means the client was not contacted. This values is sticking out as an outlier. Hence recoding the value to -1
+mktg_imp_conti$pdays <- as.integer(revalue(as.character(mktg_imp_conti$pdays), c("999" = "-1")))
+boxplot(mktg_imp_conti$pdays)
+
+boxplot(mktg_imp_conti$duration)
+
+# ScatterPlot
+head(mktg_imp)
+#pairs(mktg_imp_conti, pch=19)
+
+# Computing the p value of correlations
+cor.mtest <- function(mat, ...) {
+    mat <- as.matrix(mat)
+    n <- ncol(mat)
+    p.mat<- matrix(NA, n, n)
+    diag(p.mat) <- 0
+    for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+            tmp <- cor.test(mat[, i], mat[, j], ...)
+            p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
+        }
+    }
+  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+  p.mat
+}
+p.mat <- cor.mtest(mktg_imp_conti)
+correlation <- cor(mktg_imp_conti)
+# Correlation plot with significance level of 0.05
+corrplot(correlation, type="upper", order="hclust", p.mat = p.mat, sig.level = 0.05)
+
+
+cat_cor<- GKtauDataframe(mktg_imp_categ)
+plot(cat_cor, corrColors = "blue", type="upper")
+
+# Heat map to find correlation
+heatmap.2(correlation,col=redgreen(75), 
+          density.info="none", trace="none", dendrogram=c("row"), 
+          symm=F,symkey=T,symbreaks=T, scale="none")
+
+
+ggscatter(mktg_imp_conti, x = "pdays", y = "previous", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Pdays", ylab = "Previous Contacts")
+
+
+attach(mktg_imp)
+summary(mktg_imp)
+plot(mktg_imp$y~mktg_imp$marital,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$job,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$education,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$housing,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$loan,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$contact,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$poutcome,col=c("red","blue"))
+plot(mktg_imp$y~mktg_imp$default,col=c("red","blue"))
+
+plot(mktg_imp$marital~mktg_imp$job,col=c("red","blue","green"))
+plot(mktg_imp$housing~mktg_imp$loan,col=c("red","blue","green"))
+plot(mktg_imp$default~mktg_imp$loan,col=c("red","blue"))
+plot(mktg_imp$default~mktg_imp$housing,col=c("red","blue"))
+
+```
+
+From the correlation plot for continuous variables below variables are correlated.
+1) pdays -> previous, nr.employed
+2) previous -> pdays, nr.employed, emp.var.rate, euribor3m
+3) cons.price.id -> nr.employed, emp.var.rate, euribor3m
+4) nr.employed -> emp.var.rate, euribor3m
+5) emp.var.rate -> euribor3m
+
+From the correlation plot for continuous variables below variables are correlated.
+1) poutcome -> y (if the previous outcome of the campaign is success then more subscribes)
+
+
+```{r EDA- PCA}
+pc.result<-prcomp(mktg_imp_conti,scale.=TRUE)
+pc.result
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-mktg_imp$y
+
+# variance
+pr_var <- (pc.result$sdev)^2
+# % of variance explained
+prop_varex <- pr_var/sum(pr_var)
+# show percentage of variance of each component
+plot(prop_varex, xlab = "Principal Component", ylab = "Proportion of Variance Explained", type = "b" )
+# Scree Plot
+plot(cumsum(prop_varex), xlab = "Principal Component", ylab = "Cumulative Proportion of Variance Explained", type = "b" )
+# first 6 components are responsible for around 90% of variance
+cumsum(prop_varex)
+# This result means that the majority of information contained in 11 numeric variables can be reduced to 6 principal components.
+
+ggplot(data = pc.scores, aes(x = PC4, y = PC5)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Auto")
+
+```
+
+```{r reg}
+# Here's our linear regression formula. The variables are based on intuition looking at the correlation plots
+mktg_reg <- glm(formula = y ~ age + job + marital + education +  loan + + default + campaign + pdays + poutcome, family = binomial, data = train)
+summary(mktg_reg)
+# Predict on test data
+mktg_reg_pred <- predict(mktg_reg, test[,c(1:4,6:8,11,13,14,21)], type = "response")
+mktg_reg_pred_label <- as.factor(ifelse(mktg_reg_pred > .7, "yes", "no"))
+# Logistic regression confusion matrix
+confusionMatrix(mktg_reg_pred_label, test$y, positive = "yes")
+# Reg ROC Curve and AUC
+mktg_reg_roc <- prediction(mktg_reg_pred, test$y)
+plot(performance(mktg_reg_roc, "tpr", "fpr"))
+mktg_reg_auc <- performance(mktg_reg_roc, "auc")
+mktg_reg_auc@y.values[[1]]
+``` 
