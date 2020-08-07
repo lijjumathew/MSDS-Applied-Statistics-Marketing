@@ -1,0 +1,1306 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load libraries
+```{r}
+library(GGally)
+library(scales)
+library(formattable)
+library(leaps)
+library(car)
+library(lme4)
+library(mlbench)
+library(caret)
+library(tidyr)
+library(MASS)
+library(corrr)
+library(randomForest)
+library(ROSE)
+library(arm)
+library(glmnet)
+library(imputeMissings)
+library(ggvis)
+library(mice)
+library(ISLR)
+library(plyr)
+library(dplyr)
+library(ISOweek)
+library(corrplot)
+library(PerformanceAnalytics)
+library(psych)
+library(psychTools)
+library(mda)
+library(klaR)
+library(aod)
+library(ggfortify)
+library(factoextra)
+library(rgl)
+library(tree)
+library(randomForest)
+library(ridge)
+library(ggplot2)
+library(RColorBrewer)
+library(corrplot)
+library(reshape2)
+library(pls)
+library(bestNormalize)
+```
+
+## Load in dataset and look at data
+```{r}
+# import data
+datain <- read.csv("D:/MS Data Science/SMU/6372 - Applied Stats/Project 2/bank-additional-full.csv", header = TRUE)
+
+# View data
+str(datain)
+summary(datain)
+
+# convert to dataframe
+datain <- as.data.frame(datain)
+
+# Convert all "unknown" to NA
+datain[datain == "unknown"] <- NA
+
+# Count NA values in each column
+na_count <-sapply(datain, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+
+# Count number of yes and no
+y_count <-sapply(datain, function(y) sum(length(which(y=="yes"))))
+y_count <- data.frame(y_count)
+y_count
+
+n_count <-sapply(datain, function(y) sum(length(which(y=="no"))))
+n_count <- data.frame(n_count)
+n_count
+
+# there are 36,548 No's and 4,640 Yes's.
+```
+
+## Impute missing data & convert to numeric
+```{r}
+# convert to factor for imputation
+datain$job <- as.factor(datain$job)
+datain$marital <- as.factor(datain$marital)
+datain$education <- as.factor(datain$education)
+datain$default <- as.factor(datain$default)
+datain$housing <- as.factor(datain$housing)
+datain$loan <- as.factor(datain$loan)
+datain$contact <- as.factor(datain$contact)
+datain$month <- sapply(datain$month,function(x) grep(paste("(?i)",x,sep=""),month.abb))
+datain$day_of_week <- dplyr::recode(datain$day_of_week, 
+       "mon"="1",
+       "tue"="2",
+       "wed"="3",
+       "thu"="4",
+       "fri"="5",
+       "sat"="6",
+       "sun"="7")
+datain$day_of_week <- as.factor(datain$day_of_week)
+datain$poutcome <- as.factor(datain$poutcome)
+
+# setting up parms
+init = mice(datain, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+# impute the following columns
+meth[c("job", "marital","education","default","housing", "loan")]="polyreg"
+
+# imputate & new dataset
+set.seed(123)
+imputed = mice(datain, method=meth, predictorMatrix=predM, m=1)
+imputed <- complete(imputed)
+sapply(imputed, function(x) sum(is.na(x)))
+
+# convert to numeric
+imputed$job <- as.numeric(imputed$job)
+imputed$marital <- as.numeric(imputed$marital)
+imputed$education <- as.numeric(imputed$education)
+imputed$default <- as.numeric(imputed$default)
+imputed$housing <- as.numeric(imputed$housing)
+imputed$loan <- as.numeric(imputed$loan)
+imputed$contact <- as.numeric(imputed$contact)
+imputed$poutcome <- as.numeric(imputed$poutcome)
+imputed$day_of_week <- as.numeric(imputed$day_of_week)
+```
+
+## EDA (don't bulk run. Open and pick plot)
+```{r}
+EDAD <- imputed
+EDAD$y <- as.factor(EDAD$y)
+EDAD$y <- as.numeric(EDAD$y)
+
+# Histogram of each variable
+par(mfrow = c(5, 4))
+MASS::truehist(EDAD$age)
+MASS::truehist(EDAD$job)
+MASS::truehist(EDAD$marital)
+MASS::truehist(EDAD$education)
+MASS::truehist(EDAD$default)
+MASS::truehist(EDAD$housing)
+MASS::truehist(EDAD$loan)
+MASS::truehist(EDAD$contact)
+MASS::truehist(EDAD$month)
+MASS::truehist(EDAD$day_of_week)
+MASS::truehist(EDAD$duration)
+MASS::truehist(EDAD$campaign)
+MASS::truehist(EDAD$pdays)
+MASS::truehist(EDAD$previous)
+MASS::truehist(EDAD$poutcome)
+MASS::truehist(EDAD$emp.var.rate)
+MASS::truehist(EDAD$cons.price.idx)
+MASS::truehist(EDAD$cons.conf.idx)
+MASS::truehist(EDAD$euribor3m)
+MASS::truehist(EDAD$nr.employed)
+
+# Correlation to y variable
+x <- EDAD %>% correlate() %>% focus(y)
+x
+
+# Pairs plot. Colored by Yes/No (LONG RUN TIME)
+#pairs(EDAD[1:20],main="Whole Dataset", pch=19, col=as.numeric(EDAD$y)+1)
+#mtext("y column: red-> Yes; green-> No", 1, line=3.7,cex=.8)
+```
+
+## Normalization Techniques - EDA
+```{r}
+BNAge <- bestNormalize(as.numeric(EDAD$age, allow_orderNorm = TRUE, out_of_sample = FALSE))
+BNAge
+# For Age, no transform is neccessary
+
+BNJob <- bestNormalize(as.numeric(EDAD$job,allow_orderNorm = FALSE, out_of_sample = FALSE))
+BNJob
+# For Job, no transform is neccessary
+
+BNCam <- bestNormalize(as.numeric(EDAD$campaign,allow_orderNorm = FALSE, out_of_sample = FALSE))
+BNCam
+# For Campaign, no transform is neccessary
+
+BNConsPrice <- bestNormalize(as.numeric(EDAD$cons.price.idx,allow_orderNorm = FALSE, out_of_sample = FALSE))
+BNConsPrice
+# For cons.price.idx, no transform is neccessary
+
+BNConsConf <- bestNormalize(as.numeric(EDAD$cons.conf.idx,allow_orderNorm = FALSE, out_of_sample = FALSE))
+BNConsConf
+# For cons.conf.idx, no transform is neccessary
+
+BNNREmp <- bestNormalize(as.numeric(EDAD$nr.employed,allow_orderNorm = FALSE, out_of_sample = FALSE))
+BNNREmp
+# For nr.employed, no transform is neccessary
+
+EDAD2 <- EDAD
+EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
+EDAD2$age <- log(EDAD2$age)
+
+```
+
+## Final Datasets to be used in models
+```{r}
+set.seed(123)
+
+# EDA dataset - narrowed down to columns to be used in regression
+edadata <- EDAD2
+edadata <- edadata %>%
+  select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
+         poutcome, cons.price.idx, cons.conf.idx, y)
+
+# Original unbalanced dataset
+odata <- edadata 
+
+# Balanced dataset using under weighting
+bdata <-ovun.sample(y ~ .,data = edadata, method = "under", N = 9280)$data
+prop.table(table(bdata$y))
+
+# Balanced using ROSE package
+rdata <- ROSE(y ~ ., data = edadata)$data
+prop.table(table(rdata$y))
+```
+
+-------------------------------------------------------------------------------
+
+## Simple with original 87.85%
+```{r}
+set.seed(123)
+
+simple.o.lr <- odata
+simple.o.lr$y <- as.numeric(as.factor(simple.o.lr$y))
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.o.lr), 0.7*nrow(simple.o.lr))  # row indices for training data
+simple.o.train <- simple.o.lr[simple.index, ]  # model training data
+simple.o.test  <- simple.o.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.o.lm <- lm(y ~ ., data=simple.o.train)  # build the model
+simple.o.pred <- predict(simple.o.lm, simple.o.test)  # predict y
+
+# AIC & BIC
+AIC(simple.o.lm)
+BIC(simple.o.lm)
+
+# Summary
+summary(simple.o.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.o.test$y, predicteds=simple.o.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.o.acc <- min_max_accuracy
+simple.o.acc
+mape
+
+vif(simple.o.lm)
+```
+
+## Simple with balanced data 74.61%
+```{r}
+set.seed(123)
+
+simple.b.lr <- bdata
+simple.b.lr$y <- as.numeric(as.factor(simple.b.lr$y))
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.b.lr), 0.7*nrow(simple.b.lr))  # row indices for training data
+simple.b.train <- simple.b.lr[simple.index, ]  # model training data
+simple.b.test  <- simple.b.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.b.lm <- lm(y ~ ., data=simple.b.train)  # build the model
+simple.b.pred <- predict(simple.b.lm, simple.b.test)  # predict y
+
+# AIC & BIC
+AIC(simple.b.lm)
+BIC(simple.b.lm)
+
+# Summary
+summary(simple.b.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.b.test$y, predicteds=simple.b.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.b.acc <- min_max_accuracy
+simple.b.acc
+mape
+
+vif(simple.b.lm)
+```
+
+## Simple with rose data 74.19%
+```{r}
+set.seed(123)
+
+simple.r.lr <- rdata
+simple.r.lr$y <- as.numeric(as.factor(simple.r.lr$y))
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.r.lr), 0.7*nrow(simple.r.lr))  # row indices for training data
+simple.r.train <- simple.r.lr[simple.index, ]  # model training data
+simple.r.test  <- simple.r.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.r.lm <- lm(y ~ ., data=simple.r.train)  # build the model
+simple.r.pred <- predict(simple.r.lm, simple.r.test)  # predict y
+
+# AIC & BIC
+AIC(simple.r.lm)
+BIC(simple.r.lm)
+
+# Summary
+summary(simple.r.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.r.test$y, predicteds=simple.r.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.r.acc <- min_max_accuracy
+simple.r.acc
+mape
+
+vif(simple.r.lm)
+```
+
+-------------------------------------------------------------------------------
+
+## Ridge with original data 87.85%
+```{r}
+set.seed(123)
+
+ridge.o.lr <- odata
+
+ridge.o.lr$y <- as.numeric(as.factor(ridge.o.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.o.lr), 0.7*nrow(ridge.o.lr)) # indices for 70% training data
+ridge.o.train <- ridge.o.lr[ridge.Index, ] # training data
+ridge.o.test <- ridge.o.lr[-ridge.Index, ] # test data
+
+ridge.o.model <- linearRidge(y ~ ., data = ridge.o.train)
+
+summary(ridge.o.model)
+
+ridge.o.pred <- predict(ridge.o.model, ridge.o.test)  # predict on test data
+ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
+
+ridge.o.acc <- mean(apply(ridge.o.compare, 1, min)/apply(ridge.o.compare, 1, max)) 
+ridge.o.acc
+
+```
+
+## Ridge with balanced data 74.58%
+```{r}
+set.seed(123)
+
+ridge.b.lr <- bdata
+
+ridge.b.lr$y <- as.numeric(as.factor(ridge.b.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.b.lr), 0.7*nrow(ridge.b.lr)) # indices for 70% training data
+ridge.b.train <- ridge.b.lr[ridge.Index, ] # training data
+ridge.b.test <- ridge.b.lr[-ridge.Index, ] # test data
+
+ridge.b.model <- linearRidge(y ~ ., data = ridge.b.train)
+summary(ridge.b.model)
+
+ridge.b.pred <- predict(ridge.b.model, ridge.b.test)  # predict on test data
+ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
+
+ridge.b.acc <- mean(apply(ridge.b.compare, 1, min)/apply(ridge.b.compare, 1, max))
+ridge.b.acc
+```
+
+## Ridge with rose data 74.18%
+```{r}
+set.seed(123)
+
+ridge.r.lr <- rdata
+
+ridge.r.lr$y <- as.numeric(as.factor(ridge.r.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.r.lr), 0.7*nrow(ridge.r.lr)) # indices for 70% training data
+ridge.r.train <- ridge.r.lr[ridge.Index, ] # training data
+ridge.r.test <- ridge.r.lr[-ridge.Index, ] # test data
+
+ridge.r.model <- linearRidge(y ~ ., data = ridge.r.train)
+
+summary(ridge.r.model)
+
+ridge.r.pred <- predict(ridge.r.model, ridge.r.test)  # predict on test data
+ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
+
+ridge.r.acc <- mean(apply(ridge.r.compare, 1, min)/apply(ridge.r.compare, 1, max)) 
+ridge.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## LASSO Regression original data (DOES NOT WORK)
+```{r}
+par(mfrow=c(1,2))
+set.seed(123)
+
+lasso.lr <- fdata
+lasso.lr$y <- as.numeric(as.factor(lasso.lr$y))
+
+# Center y, X will be standardized in the modelling function
+y <- lasso.lr %>% select(y) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+X <- lasso.lr %>% select(-y) %>% as.matrix()
+
+# Perform 10-fold cross-validation to select lambda ---------------------------
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 1 implements lasso regression
+lasso_cv <- cv.glmnet(X, y, alpha = 1, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+# Plot cross-validation results
+plot(lasso_cv)
+
+# Best cross-validated lambda
+lambda_cv <- lasso_cv$lambda.min
+# Fit final model, get its sum of squared residuals and multiple R-squared
+model_cv <- glmnet(X, y, alpha = 1, lambda = lambda_cv, standardize = TRUE)
+y_hat_cv <- predict(model_cv, X)
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv)
+rsq_lasso_cv <- cor(y, y_hat_cv)^2
+rsq_lasso_cv 
+
+# See how increasing lambda shrinks the coefficients --------------------------
+# Each line shows coefficients for one variables, for different lambdas.
+# The higher the lambda, the more the coefficients are shrinked towards zero.
+res <- glmnet(X, y, alpha = 1, lambda = lambdas_to_try, standardize = FALSE)
+plot(res, xvar = "lambda")
+legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
+```
+
+## LASSO Regression balanced data (DOES NOT WORK)
+```{r}
+set.seed(123)
+
+fdata$y <- as.factor(fdata$y)
+prop.table(table(fdata$y))
+
+balanced_fdata <-ovun.sample(y ~ .,data = fdata, method = "under", N = 9280, seed = 1)$data
+prop.table(table(balanced_fdata$y))
+
+lasso.lr <- balanced_fdata
+lasso.lr$y <- as.numeric(as.factor(lasso.lr$y))
+
+# Split the data into training and test set
+training.samples <- lasso.lr$y %>% 
+  createDataPartition(p = 0.67, list = FALSE)
+train.data  <- lasso.lr[training.samples, ]
+test.data <- lasso.lr[-training.samples, ]
+
+# Dumy code categorical predictor variables
+x <- model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, train.data)[,-20]
+# Convert the outcome (class) to a numerical variable
+y <- ifelse(lasso.lr$y == "pos", 1, 0)
+
+# Find the best lambda using cross-validation
+set.seed(123) 
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+# Fit the final model on the training data
+model <- glmnet(x, y, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+# Display regression coefficients
+coef(model)
+# Make predictions on the test data
+x.test <- model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, test.data)[,-1]
+probabilities <- model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, "pos", "neg")
+# Model accuracy
+observed.classes <- test.data$y
+mean(predicted.classes == observed.classes)
+legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
+```
+
+-------------------------------------------------------------------------------
+
+## Elastic Net (DOES NOT WORK)
+```{r}
+set.seed(123)
+
+EN.lr <- fdata
+
+EN.lr$y <- as.numeric(as.factor(EN.lr$y))
+
+EN.train = EN.lr %>% sample_frac(0.5)
+
+EN.test = EN.lr %>% setdiff(EN.train)
+
+EN.x_train = model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, EN.train)[,-1]
+EN.x_test = model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, EN.test)[,-1]
+
+
+# Set training control
+EN.train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(y ~ .,
+                           data = EN.train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = EN.train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+
+# Coefficients
+coef(elastic_reg$finalModel, elastic_reg$bestTune$lambda)
+
+# Make predictions on the test data
+EN.predictions <- elastic_reg %>% predict(EN.test)
+# Model performance metrics
+Net.RMSE <- RMSE(EN.predictions, EN.test$y)
+Net.R2 <- R2(EN.predictions, EN.test$y)
+Net.RMSE
+Net.R2
+```
+
+-------------------------------------------------------------------------------
+
+## Traditional Feature Selection on original data (AIC metric)
+```{r}
+set.seed(123)
+
+train.control <- trainControl(method = "cv", number = 10)
+
+#-------------------------------------------------------------------------------
+
+# Stepwise Model
+step.o.model <- train(y ~., data = odata,
+                    method = "lmStepAIC", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+step.o.model$results
+# Final model coefficients
+step.o.model$finalModel
+# Summary of the model
+summary(step.o.model$finalModel)
+step.o.adjr2 <- 0.1268
+
+#-------------------------------------------------------------------------------
+
+# Forward Model
+fwd.o.model <- train(y ~., data = odata,
+                    method = "leapForward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+fwd.o.model$results
+# Final model coefficients
+fwd.o.model$finalModel
+# Summary of the model
+summary(fwd.o.model$finalModel)
+fwd.o.adjr2 <- 0.1182
+
+#-------------------------------------------------------------------------------
+
+# Backward Model
+bck.o.model <- train(y ~., data = odata,
+                    method = "leapBackward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+bck.o.model$results
+# Final model coefficients
+bck.o.model$finalModel
+# Summary of the model
+summary(bck.o.model$finalModel)
+bck.o.adjr2 <- 0.1184
+```
+
+## Traditional Feature Selection on balanced data (AIC metric)
+```{r}
+set.seed(123)
+
+train.control <- trainControl(method = "cv", number = 10)
+
+#-------------------------------------------------------------------------------
+
+# Stepwise Model
+step.b.model <- train(y ~., data = bdata,
+                    method = "lmStepAIC", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+step.b.model$results
+# Final model coefficients
+step.b.model$finalModel
+# Summary of the model
+summary(step.b.model$finalModel)
+step.b.adjr2 <- 0.1494
+
+#-------------------------------------------------------------------------------
+
+# Forward Model
+fwd.b.model <- train(y ~., data = bdata,
+                    method = "leapForward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+fwd.b.model$results
+# Final model coefficients
+fwd.b.model$finalModel
+# Summary of the model
+summary(fwd.b.model$finalModel)
+fwd.b.adjr2 <- 0.1283
+
+#-------------------------------------------------------------------------------
+
+# Backward Model
+bck.b.model <- train(y ~., data = bdata,
+                    method = "leapBackward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+bck.b.model$results
+# Final model coefficients
+bck.b.model$finalModel
+# Summary of the model
+summary(bck.b.model$finalModel)
+bck.b.adjr2 <- 0.1357
+```
+
+## Traditional Feature Selection on rose data (AIC metric)
+```{r}
+set.seed(123)
+
+train.control <- trainControl(method = "cv", number = 10)
+
+#-------------------------------------------------------------------------------
+
+# Stepwise Model
+step.r.model <- train(y ~., data = rdata,
+                    method = "lmStepAIC", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+step.r.model$results
+# Final model coefficients
+step.r.model$finalModel
+# Summary of the model
+summary(step.r.model$finalModel)
+step.r.adjr2 <- 0.1334
+
+#-------------------------------------------------------------------------------
+
+# Forward Model
+fwd.r.model <- train(y ~., data = rdata,
+                    method = "leapForward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+fwd.r.model$results
+# Final model coefficients
+fwd.r.model$finalModel
+# Summary of the model
+summary(fwd.r.model$finalModel)
+fwd.r.adjr2 <- 0.1155
+
+#-------------------------------------------------------------------------------
+
+# Backward Model
+bck.r.model <- train(y ~., data = rdata,
+                    method = "leapBackward", 
+                    trControl = train.control,
+                    trace = FALSE
+                    )
+# Model accuracy
+bck.r.model$results
+# Final model coefficients
+bck.r.model$finalModel
+# Summary of the model
+summary(bck.r.model$finalModel)
+bck.r.adjr2 <- 0.1155
+```
+
+-------------------------------------------------------------------------------
+
+## Logit with original data 97.38%
+```{r}
+set.seed(123)
+
+logit.o.data <- odata
+
+logit.o.data$y <- as.factor(logit.o.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.o.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.o.Train <- logit.o.data[ trainIndex,]
+logit.o.Test  <- logit.o.data[-trainIndex,]
+
+logit.o.model <- glm(y ~ ., data = logit.o.Train, family = "binomial")
+summary(logit.o.model)
+
+logit.o.Test$model_prob <- predict(logit.o.model, logit.o.Test, type = "response")
+
+logit.o.Test <- logit.o.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
+                                 bin1 = 1*(y == "Yes") + 0)
+
+logit.o.Test <- logit.o.Test %>% mutate(accurate = 1*(model_pred == bin1))
+logit.o.acc <- sum(logit.o.Test$accurate)/nrow(logit.o.Test)
+logit.o.acc
+
+vif(logit.o.model)
+
+```
+
+## Logit with balanced data 62.78%
+```{r}
+set.seed(123)
+
+logit.b.data <- bdata
+logit.b.data$y <- as.factor(logit.b.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.b.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.b.Train <- logit.b.data[ trainIndex,]
+logit.b.Test  <- logit.b.data[-trainIndex,]
+
+logit.b.model <- glm(y ~ ., data = logit.b.Train, family="binomial")
+summary(logit.b.model)
+
+logit.b.Test$model_prob <- predict(logit.b.model, logit.b.Test, type = "response")
+
+logit.b.Test <- logit.b.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
+                                 bin1 = 1*(y == "Yes") + 0)
+
+logit.b.Test <- logit.b.Test %>% mutate(accurate = 1*(model_pred == bin1))
+logit.b.acc <- sum(logit.b.Test$accurate)/nrow(logit.b.Test)
+logit.b.acc
+
+vif(logit.b.model)
+```
+
+## Logit with rose data 61.31%
+```{r}
+set.seed(123)
+
+logit.r.data <- rdata
+logit.r.data$y <- as.factor(logit.r.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.r.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.r.Train <- logit.r.data[ trainIndex,]
+logit.r.Test  <- logit.r.data[-trainIndex,]
+
+logit.r.model <- glm(y ~ ., data = logit.r.Train, family="binomial")
+summary(logit.r.model)
+
+logit.r.Test$model_prob <- predict(logit.r.model, logit.r.Test, type = "response")
+
+logit.r.Test <- logit.r.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
+                                 bin1 = 1*(y == "Yes") + 0)
+
+logit.r.Test <- logit.r.Test %>% mutate(accurate = 1*(model_pred == bin1))
+logit.r.acc <- sum(logit.r.Test$accurate)/nrow(logit.r.Test)
+logit.r.acc
+
+vif(logit.r.model)
+```
+
+-------------------------------------------------------------------------------
+
+## LDA with original data 89.83%
+```{r}
+set.seed(123)
+
+# Split the data into training (70%) and test set (30%)
+lda.o.data <- odata
+training.samples <- lda.o.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+LDA.o.train.data <- lda.o.data[training.samples, ]
+LDA.o.test.data <- lda.o.data[-training.samples, ]
+
+# Estimate preprocessing parameters
+o.preproc.param <- LDA.o.train.data %>% 
+  preProcess(method = c("center", "scale"))
+# Transform the data using the estimated parameters
+LDA.o.train.transformed <- o.preproc.param %>% predict(LDA.o.train.data)
+LDA.o.test.transformed <- o.preproc.param %>% predict(LDA.o.test.data)
+
+# Model
+lda.o.model <- lda(y ~ ., data = LDA.o.train.transformed)
+lda.o.model
+
+# Plot results
+plot(lda.o.model)
+
+# Make predictions
+lda.o.predictions <- lda.o.model %>% predict(LDA.o.test.transformed)
+
+# Accuracy
+lda.o.acc <- mean(lda.o.predictions$class==LDA.o.test.transformed$y)
+lda.o.acc
+```
+
+## LDA with balanced data 64.11%
+```{r}
+set.seed(123)
+
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+lda.b.data <- bdata
+training.samples <- lda.b.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+LDA.b.train.data <- lda.b.data[training.samples, ]
+LDA.b.test.data <- lda.b.data[-training.samples, ]
+
+# Estimate preprocessing parameters
+b.preproc.param <- LDA.b.train.data %>% 
+  preProcess(method = c("center", "scale"))
+# Transform the data using the estimated parameters
+LDA.b.train.transformed <- b.preproc.param %>% predict(LDA.b.train.data)
+LDA.b.test.transformed <- b.preproc.param %>% predict(LDA.b.test.data)
+
+# Model
+lda.b.model <- lda(y ~ ., data = LDA.b.train.transformed)
+lda.b.model
+
+# Plot results
+plot(lda.b.model)
+
+# Make predictions
+lda.b.predictions <- lda.b.model %>% predict(LDA.b.test.transformed)
+
+# Accuracy
+lda.b.acc <- mean(lda.b.predictions$class==LDA.b.test.transformed$y)
+lda.b.acc
+```
+
+## LDA with rose data 64.49%
+```{r}
+set.seed(123)
+
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+lda.r.data <- rdata
+training.samples <- lda.r.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+LDA.r.train.data <- lda.r.data[training.samples, ]
+LDA.r.test.data <- lda.r.data[-training.samples, ]
+
+# Estimate preprocessing parameters
+r.preproc.param <- LDA.r.train.data %>% 
+  preProcess(method = c("center", "scale"))
+# Transform the data using the estimated parameters
+LDA.r.train.transformed <- r.preproc.param %>% predict(LDA.r.train.data)
+LDA.r.test.transformed <- r.preproc.param %>% predict(LDA.r.test.data)
+
+# Model
+lda.r.model <- lda(y ~ ., data = LDA.r.train.transformed)
+lda.r.model
+
+# Plot results
+plot(lda.r.model)
+
+# Make predictions
+lda.r.predictions <- lda.r.model %>% predict(LDA.r.test.transformed)
+
+# Accuracy
+lda.r.acc <- mean(lda.r.predictions$class==LDA.r.test.transformed$y)
+lda.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## QDA with original data 88.17%
+```{r}
+set.seed(123)
+
+QDA.o.Data <- odata
+
+QDA.o.Data$y <- as.numeric(as.factor(QDA.o.Data$y))
+
+training.samples <- QDA.o.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+QDA.o.train.data <- QDA.o.Data[training.samples, ]
+QDA.o.test.data <- QDA.o.Data[-training.samples, ]
+
+# Fit the model
+qda.o.model <- qda(y ~ ., data = QDA.o.train.data)
+qda.o.model
+
+# Make predictions
+qda.o.predictions <- qda.o.model %>% predict(QDA.o.test.data)
+
+# Model accuracy
+qda.o.acc <- mean(qda.o.predictions$class == QDA.o.test.data$y)
+qda.o.acc
+```
+
+## QDA with balanced data 65.12%
+```{r}
+set.seed(123)
+
+QDA.b.Data <- bdata
+
+QDA.b.Data$y <- as.numeric(as.factor(QDA.b.Data$y))
+
+training.samples <- QDA.b.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+QDA.b.train.data <- QDA.b.Data[training.samples, ]
+QDA.b.test.data <- QDA.b.Data[-training.samples, ]
+
+# Fit the model
+qda.b.model <- qda(y ~ ., data = QDA.b.train.data)
+qda.b.model
+
+# Make predictions
+qda.b.predictions <- qda.b.model %>% predict(QDA.b.test.data)
+
+# Model accuracy
+qda.b.acc <- mean(qda.b.predictions$class == QDA.b.test.data$y)
+qda.b.acc
+```
+
+## QDA with rose data 80.67%
+```{r}
+set.seed(123)
+
+QDA.r.Data <- rdata
+
+QDA.r.Data$y <- as.numeric(as.factor(QDA.r.Data$y))
+
+training.samples <- QDA.r.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+QDA.r.train.data <- QDA.r.Data[training.samples, ]
+QDA.r.test.data <- QDA.r.Data[-training.samples, ]
+
+# Fit the model
+qda.r.model <- qda(y ~ ., data = QDA.r.train.data)
+qda.r.model
+
+# Make predictions
+qda.r.predictions <- qda.r.model %>% predict(QDA.r.test.data)
+
+# Model accuracy
+qda.r.acc <- mean(qda.r.predictions$class == QDA.r.test.data$y)
+qda.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## MDA with original data 88.69%
+```{r}
+set.seed(123)
+
+MDA.o.Data <- odata
+MDA.o.Data$y <- as.numeric(as.factor(MDA.o.Data$y))
+
+training.samples <- MDA.o.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+MDA.o.train.data <- MDA.o.Data[training.samples, ]
+MDA.o.test.data <- MDA.o.Data[-training.samples, ]
+
+# Fit the model
+mda.o.model <- mda(y ~ ., data = MDA.o.train.data)
+mda.o.model
+# Make predictions
+mda.o.predicted.classes <- mda.o.model %>% predict(MDA.o.test.data)
+# Model accuracy
+mda.o.acc <- mean(mda.o.predicted.classes == MDA.o.test.data$y)
+mda.o.acc
+```
+
+## MDA with balanced data 63.72%
+```{r}
+set.seed(123)
+
+MDA.b.Data <- bdata
+MDA.b.Data$y <- as.numeric(as.factor(MDA.b.Data$y))
+
+training.samples <- MDA.b.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+MDA.b.train.data <- MDA.b.Data[training.samples, ]
+MDA.b.test.data <- MDA.b.Data[-training.samples, ]
+
+# Fit the model
+mda.b.model <- mda(y ~ ., data = MDA.b.train.data)
+mda.b.model
+# Make predictions
+mda.b.predicted.classes <- mda.b.model %>% predict(MDA.b.test.data)
+# Model accuracy
+mda.b.acc <- mean(mda.b.predicted.classes == MDA.b.test.data$y)
+mda.b.acc
+```
+
+## MDA with rose data 67.19%
+```{r}
+set.seed(123)
+
+MDA.r.Data <- rdata
+MDA.r.Data$y <- as.numeric(as.factor(MDA.r.Data$y))
+
+training.samples <- MDA.r.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+MDA.r.train.data <- MDA.r.Data[training.samples, ]
+MDA.r.test.data <- MDA.r.Data[-training.samples, ]
+
+# Fit the model
+mda.r.model <- mda(y ~ ., data = MDA.r.train.data)
+mda.r.model
+# Make predictions
+mda.r.predicted.classes <- mda.r.model %>% predict(MDA.r.test.data)
+# Model accuracy
+mda.r.acc <- mean(mda.r.predicted.classes == MDA.r.test.data$y)
+mda.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## FDA with original data 89.83%
+```{r}
+set.seed(123)
+
+FDA.o.Data <- odata
+FDA.o.Data$y <- as.numeric(as.factor(FDA.o.Data$y))
+
+training.samples <- FDA.o.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+FDA.o.train.data <- FDA.o.Data[training.samples, ]
+FDA.o.test.data <- FDA.o.Data[-training.samples, ]
+
+# Fit the model
+fda.o.model <- fda(y ~ ., data = FDA.o.train.data)
+# Make predictions
+fda.o.predicted.classes <- fda.o.model %>% predict(FDA.o.test.data)
+# Model accuracy
+fda.o.acc <- mean(fda.o.predicted.classes == FDA.o.test.data$y)
+fda.o.acc
+```
+
+## FDA with balanced data 64.11%
+```{r}
+set.seed(123)
+
+FDA.b.Data <- bdata
+FDA.b.Data$y <- as.numeric(as.factor(FDA.b.Data$y))
+
+training.samples <- FDA.b.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+FDA.b.train.data <- FDA.b.Data[training.samples, ]
+FDA.b.test.data <- FDA.b.Data[-training.samples, ]
+
+# Fit the model
+fda.b.model <- fda(y ~ ., data = FDA.b.train.data)
+# Make predictions
+fda.b.predicted.classes <- fda.b.model %>% predict(FDA.b.test.data)
+# Model accuracy
+fda.b.acc <- mean(fda.b.predicted.classes == FDA.b.test.data$y)
+fda.b.acc
+```
+
+## FDA with rose data 64.49%
+```{r}
+set.seed(123)
+
+FDA.r.Data <- rdata
+FDA.r.Data$y <- as.numeric(as.factor(FDA.r.Data$y))
+
+training.samples <- FDA.r.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+FDA.r.train.data <- FDA.r.Data[training.samples, ]
+FDA.r.test.data <- FDA.r.Data[-training.samples, ]
+
+# Fit the model
+fda.r.model <- fda(y ~ ., data = FDA.r.train.data)
+# Make predictions
+fda.r.predicted.classes <- fda.r.model %>% predict(FDA.r.test.data)
+# Model accuracy
+fda.r.acc <- mean(fda.r.predicted.classes == FDA.r.test.data$y)
+fda.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## RDA with original data 89.85%
+```{r}
+set.seed(123)
+
+RDA.o.Data <- odata
+RDA.o.Data$y <- as.numeric(as.factor(RDA.o.Data$y))
+
+training.samples <- RDA.o.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+RDA.o.train.data <- RDA.o.Data[training.samples, ]
+RDA.o.test.data <- RDA.o.Data[-training.samples, ]
+
+# Fit the model
+rda.o.model <- rda(y ~ ., data = RDA.o.train.data)
+# Make predictions
+rda.o.predictions <- rda.o.model %>% predict(RDA.o.test.data)
+# Model accuracy
+rda.o.acc <- mean(rda.o.predictions$class == RDA.o.test.data$y)
+rda.o.acc
+```
+
+## RDA with balanced data 64.76%
+```{r}
+set.seed(123)
+
+RDA.b.Data <- bdata
+RDA.b.Data$y <- as.numeric(as.factor(RDA.b.Data$y))
+
+training.samples <- RDA.b.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+RDA.b.train.data <- RDA.b.Data[training.samples, ]
+RDA.b.test.data <- RDA.b.Data[-training.samples, ]
+
+# Fit the model
+rda.b.model <- rda(y ~ ., data = RDA.b.train.data)
+# Make predictions
+rda.b.predictions <- rda.b.model %>% predict(RDA.b.test.data)
+# Model accuracy
+rda.b.acc <- mean(rda.b.predictions$class == RDA.b.test.data$y)
+rda.b.acc
+```
+
+## RDA with rose data 80.67%
+```{r}
+set.seed(123)
+
+RDA.r.Data <- rdata
+RDA.r.Data$y <- as.numeric(as.factor(RDA.r.Data$y))
+
+training.samples <- RDA.r.Data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+RDA.r.train.data <- RDA.r.Data[training.samples, ]
+RDA.r.test.data <- RDA.r.Data[-training.samples, ]
+
+# Fit the model
+rda.r.model <- rda(y ~ ., data = RDA.r.train.data)
+# Make predictions
+rda.r.predictions <- rda.r.model %>% predict(RDA.r.test.data)
+# Model accuracy
+rda.r.acc <- mean(rda.r.predictions$class == RDA.r.test.data$y)
+rda.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## RF with original data 89.73% & 2 mtry
+```{r}
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+rf.o.data <- odata
+training.samples <- rf.o.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+rf.o.train.data <- rf.o.data[training.samples, ]
+rf.o.test.data <- rf.o.data[-training.samples, ]
+
+# Converting ‘y’ to a factor
+rf.o.train.data$y <- factor(rf.o.train.data$y)
+
+# set cross validation parameters
+trControl <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+
+# Training using ‘random forest’ algorithm
+rf.o.model <- train(y~.,data = rf.o.train.data, method = "rf", 
+                    metric = "Accuracy", importance = TRUE,
+                    trControl = trControl,  ntree = 50)
+
+print(rf.o.model)
+plot(rf.o.model)
+
+rf.o.model$bestTune$mtry
+rf.o.acc <- max(rf.o.model$results$Accuracy)
+rf.o.acc
+```
+
+## RF with balanced data 74.06% & 2 mtry
+```{r}
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+rf.b.data <- bdata
+training.samples <- rf.b.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+rf.b.train.data <- rf.b.data[training.samples, ]
+rf.b.test.data <- rf.b.data[-training.samples, ]
+
+# Converting ‘y’ to a factor
+rf.b.train.data$y <- factor(rf.b.train.data$y)
+
+# set cross validation parameters
+trControl <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+
+# Training using ‘random forest’ algorithm
+rf.b.model <- train(y~.,data = rf.b.train.data, method = "rf", 
+                    metric = "Accuracy", importance = TRUE,
+                    trControl = trControl, ntree = 50)
+
+print(rf.b.model)
+plot(rf.b.model)
+
+rf.b.model$bestTune$mtry
+rf.b.acc <- max(rf.b.model$results$Accuracy)
+rf.b.acc
+```
+
+## RF with rose data 88.68% & 2 mtry
+```{r}
+# Split the data into training (70%) and test set (30%)
+set.seed(123)
+rf.r.data <- rdata
+training.samples <- rf.r.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+rf.r.train.data <- rf.r.data[training.samples, ]
+rf.r.test.data <- rf.r.data[-training.samples, ]
+
+# Converting ‘y’ to a factor
+rf.r.train.data$y <- factor(rf.r.train.data$y)
+
+# set cross validation parameters
+trControl <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+
+# Training using ‘random forest’ algorithm
+rf.r.model <- train(y~.,data = rf.r.train.data, method = "rf", 
+                    metric = "Accuracy", importance = TRUE,
+                    trControl = trControl, ntree = 50)
+
+print(rf.r.model)
+plot(rf.r.model)
+
+rf.r.model$bestTune$mtry
+rf.r.acc <- max(rf.r.model$results$Accuracy)
+rf.r.acc
+```
+
+-------------------------------------------------------------------------------
+
+## Results table
+```{r}
+SLR.results <- cbind(simple.o.acc, simple.b.acc, simple.r.acc)
+RR.results <- cbind(ridge.o.acc, ridge.b.acc, ridge.r.acc)
+#LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
+#EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
+STEP.results <- cbind(step.o.adjr2, step.b.adjr2, step.r.adjr2)
+FWD.results <- cbind(fwd.o.adjr2, fwd.b.adjr2, fwd.r.adjr2) 
+BCK.results <- cbind(bck.o.adjr2, bck.b.adjr2, bck.r.adjr2)
+LR.results <- cbind(logit.o.acc, logit.b.acc, logit.r.acc)
+LDA.results <- cbind(lda.o.acc, lda.b.acc, lda.r.acc)
+QDA.results <- cbind(qda.o.acc, qda.b.acc, qda.r.acc)
+MDA.results <- cbind(mda.o.acc, mda.b.acc, mda.r.acc)
+FDA.results <- cbind(fda.o.acc, fda.b.acc, fda.r.acc)
+RDA.results <- cbind(rda.o.acc, rda.b.acc, rda.r.acc)
+RF.results <- cbind(rf.o.acc, rf.b.acc, rf.r.acc)
+
+results <- rbind(SLR.results, RR.results, STEP.results, 
+                 FWD.results, BCK.results, LR.results,
+                 LDA.results, QDA.results, MDA.results,
+                 FDA.results, RDA.results, RF.results)
+
+colnames(results) <- c("Unbalanded", "Under-balanced", "Rose Balanced")
+row.names(results) <- c("Simple LR", "Ridge",
+                        "Stewpise (AdjR2)", "Backward (AdjR2)", 
+                        "Forward (AdjR2)",  "Logistic", "LDA", "QDA",
+                        "MDA", "FDA", "RDA", "Random Forest")
+formattable(results)
+```
+
