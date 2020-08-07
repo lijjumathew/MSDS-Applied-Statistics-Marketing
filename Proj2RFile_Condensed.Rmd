@@ -193,16 +193,18 @@ BNConsConf
 BNNREmp <- bestNormalize(as.numeric(EDAD$nr.employed,allow_orderNorm = FALSE, out_of_sample = FALSE))
 BNNREmp
 # For nr.employed, no transform is neccessary
-
-EDAD2 <- EDAD
-EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
-EDAD2$age <- log(EDAD2$age)
-
 ```
 
-## Final Datasets to be used in models
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+# Objective 1 - Simple Logistic Regression
+## Final Datasets to be used in objective 1
 ```{r}
 set.seed(123)
+
+# Select transformations
+EDAD2 <- EDAD
 
 # EDA dataset - narrowed down to columns to be used in regression
 edadata <- EDAD2
@@ -222,7 +224,176 @@ rdata <- ROSE(y ~ ., data = edadata)$data
 prop.table(table(rdata$y))
 ```
 
--------------------------------------------------------------------------------
+# ----------------------
+
+## Logit with original data 89.69%
+```{r}
+set.seed(123)
+
+logit.os.data <- odata
+logit.os.data$y <- as.factor(logit.os.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.os.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.os.Train <- logit.os.data[ trainIndex,]
+logit.os.Test  <- logit.os.data[-trainIndex,]
+
+# Build Full Model
+full.os.log<-glm(y~.,family="binomial",data=logit.os.Train)
+
+# Step Model
+step.os.log<-full.os.log %>% stepAIC(trace=FALSE)
+
+# Model Summary
+summary(step.os.log)
+
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+
+# VIF Scores
+vif(step.os.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.os.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+```
+
+## Logit with balanced data 64.29%
+```{r}
+set.seed(123)
+
+logit.bs.data <- bdata
+logit.bs.data$y <- as.factor(logit.bs.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.bs.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.bs.Train <- logit.bs.data[ trainIndex,]
+logit.bs.Test  <- logit.bs.data[-trainIndex,]
+
+# Build Full Model
+full.bs.log<-glm(y~.,family="binomial",data=logit.bs.Train)
+
+# Step Model
+step.bs.log<-full.bs.log %>% stepAIC(trace=FALSE)
+
+# Model Summary
+summary(step.bs.log)
+
+# Error Metrics
+step.bs.aic <- step.bs.log$aic
+step.bs.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.bs.log), confint.default(step.bs.log, level = 0.95)))
+
+# VIF Scores
+vif(step.bs.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.bs.log,newdata=logit.bs.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.bs.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.bs.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.bs.logit.acc
+```
+
+## Logit with rose data 64.37%
+```{r}
+set.seed(123)
+
+logit.rs.data <- rdata
+logit.rs.data$y <- as.factor(logit.rs.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.rs.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.rs.Train <- logit.rs.data[ trainIndex,]
+logit.rs.Test  <- logit.rs.data[-trainIndex,]
+
+# Build Full Model
+full.rs.log<-glm(y~.,family="binomial",data=logit.rs.Train)
+
+# Step Model
+step.rs.log<-full.rs.log %>% stepAIC(trace=FALSE)
+
+# Model Summary
+summary(step.rs.log)
+
+# Error Metrics
+step.rs.aic <- step.rs.log$aic
+step.rs.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.rs.log), confint.default(step.rs.log, level = 0.95)))
+
+# VIF Scores
+vif(step.rs.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.rs.log,newdata=logit.rs.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.rs.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.rs.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.rs.logit.acc
+```
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+# Objective 2
+## Final Datasets to be used in objective 2
+```{r}
+set.seed(123)
+
+# Select transformations
+EDAD2 <- EDAD
+EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
+EDAD2$age <- log(EDAD2$age)
+
+
+# EDA dataset - narrowed down to columns to be used in regression
+edadata <- EDAD2
+edadata <- edadata %>%
+  select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
+         poutcome, cons.price.idx, cons.conf.idx, y)
+
+# Original unbalanced dataset
+odata <- edadata 
+
+# Balanced dataset using under weighting
+bdata <-ovun.sample(y ~ .,data = edadata, method = "under", N = 9280)$data
+prop.table(table(bdata$y))
+
+# Balanced using ROSE package
+rdata <- ROSE(y ~ ., data = edadata)$data
+prop.table(table(rdata$y))
+```
+
+# ------------------------------------
 
 ## Simple with original 87.85%
 ```{r}
@@ -241,8 +412,10 @@ simple.o.lm <- lm(y ~ ., data=simple.o.train)  # build the model
 simple.o.pred <- predict(simple.o.lm, simple.o.test)  # predict y
 
 # AIC & BIC
-AIC(simple.o.lm)
-BIC(simple.o.lm)
+simple.o.aic <- AIC(simple.o.lm)
+simple.o.bic <- BIC(simple.o.lm)
+simple.o.aic
+simple.o.bic
 
 # Summary
 summary(simple.o.lm)
@@ -275,8 +448,9 @@ simple.b.lm <- lm(y ~ ., data=simple.b.train)  # build the model
 simple.b.pred <- predict(simple.b.lm, simple.b.test)  # predict y
 
 # AIC & BIC
-AIC(simple.b.lm)
-BIC(simple.b.lm)
+simple.b.aic <- AIC(simple.b.lm)
+simple.b.bic <- BIC(simple.b.lm)
+simple.b.aic
 
 # Summary
 summary(simple.b.lm)
@@ -309,8 +483,9 @@ simple.r.lm <- lm(y ~ ., data=simple.r.train)  # build the model
 simple.r.pred <- predict(simple.r.lm, simple.r.test)  # predict y
 
 # AIC & BIC
-AIC(simple.r.lm)
-BIC(simple.r.lm)
+simple.r.aic <- AIC(simple.r.lm)
+simplr.r.bic <- BIC(simple.r.lm)
+simple.r.aic
 
 # Summary
 summary(simple.r.lm)
@@ -326,382 +501,13 @@ mape
 vif(simple.r.lm)
 ```
 
--------------------------------------------------------------------------------
+# -------------------------------------
 
-## Ridge with original data 87.85%
-```{r}
-set.seed(123)
-
-ridge.o.lr <- odata
-
-ridge.o.lr$y <- as.numeric(as.factor(ridge.o.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.o.lr), 0.7*nrow(ridge.o.lr)) # indices for 70% training data
-ridge.o.train <- ridge.o.lr[ridge.Index, ] # training data
-ridge.o.test <- ridge.o.lr[-ridge.Index, ] # test data
-
-ridge.o.model <- linearRidge(y ~ ., data = ridge.o.train)
-
-summary(ridge.o.model)
-
-ridge.o.pred <- predict(ridge.o.model, ridge.o.test)  # predict on test data
-ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
-
-ridge.o.acc <- mean(apply(ridge.o.compare, 1, min)/apply(ridge.o.compare, 1, max)) 
-ridge.o.acc
-
-```
-
-## Ridge with balanced data 74.58%
-```{r}
-set.seed(123)
-
-ridge.b.lr <- bdata
-
-ridge.b.lr$y <- as.numeric(as.factor(ridge.b.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.b.lr), 0.7*nrow(ridge.b.lr)) # indices for 70% training data
-ridge.b.train <- ridge.b.lr[ridge.Index, ] # training data
-ridge.b.test <- ridge.b.lr[-ridge.Index, ] # test data
-
-ridge.b.model <- linearRidge(y ~ ., data = ridge.b.train)
-summary(ridge.b.model)
-
-ridge.b.pred <- predict(ridge.b.model, ridge.b.test)  # predict on test data
-ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
-
-ridge.b.acc <- mean(apply(ridge.b.compare, 1, min)/apply(ridge.b.compare, 1, max))
-ridge.b.acc
-```
-
-## Ridge with rose data 74.18%
-```{r}
-set.seed(123)
-
-ridge.r.lr <- rdata
-
-ridge.r.lr$y <- as.numeric(as.factor(ridge.r.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.r.lr), 0.7*nrow(ridge.r.lr)) # indices for 70% training data
-ridge.r.train <- ridge.r.lr[ridge.Index, ] # training data
-ridge.r.test <- ridge.r.lr[-ridge.Index, ] # test data
-
-ridge.r.model <- linearRidge(y ~ ., data = ridge.r.train)
-
-summary(ridge.r.model)
-
-ridge.r.pred <- predict(ridge.r.model, ridge.r.test)  # predict on test data
-ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
-
-ridge.r.acc <- mean(apply(ridge.r.compare, 1, min)/apply(ridge.r.compare, 1, max)) 
-ridge.r.acc
-```
-
--------------------------------------------------------------------------------
-
-## LASSO Regression original data (DOES NOT WORK)
-```{r}
-par(mfrow=c(1,2))
-set.seed(123)
-
-lasso.lr <- fdata
-lasso.lr$y <- as.numeric(as.factor(lasso.lr$y))
-
-# Center y, X will be standardized in the modelling function
-y <- lasso.lr %>% select(y) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
-X <- lasso.lr %>% select(-y) %>% as.matrix()
-
-# Perform 10-fold cross-validation to select lambda ---------------------------
-lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
-# Setting alpha = 1 implements lasso regression
-lasso_cv <- cv.glmnet(X, y, alpha = 1, lambda = lambdas_to_try,
-                      standardize = TRUE, nfolds = 10)
-# Plot cross-validation results
-plot(lasso_cv)
-
-# Best cross-validated lambda
-lambda_cv <- lasso_cv$lambda.min
-# Fit final model, get its sum of squared residuals and multiple R-squared
-model_cv <- glmnet(X, y, alpha = 1, lambda = lambda_cv, standardize = TRUE)
-y_hat_cv <- predict(model_cv, X)
-ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv)
-rsq_lasso_cv <- cor(y, y_hat_cv)^2
-rsq_lasso_cv 
-
-# See how increasing lambda shrinks the coefficients --------------------------
-# Each line shows coefficients for one variables, for different lambdas.
-# The higher the lambda, the more the coefficients are shrinked towards zero.
-res <- glmnet(X, y, alpha = 1, lambda = lambdas_to_try, standardize = FALSE)
-plot(res, xvar = "lambda")
-legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
-```
-
-## LASSO Regression balanced data (DOES NOT WORK)
-```{r}
-set.seed(123)
-
-fdata$y <- as.factor(fdata$y)
-prop.table(table(fdata$y))
-
-balanced_fdata <-ovun.sample(y ~ .,data = fdata, method = "under", N = 9280, seed = 1)$data
-prop.table(table(balanced_fdata$y))
-
-lasso.lr <- balanced_fdata
-lasso.lr$y <- as.numeric(as.factor(lasso.lr$y))
-
-# Split the data into training and test set
-training.samples <- lasso.lr$y %>% 
-  createDataPartition(p = 0.67, list = FALSE)
-train.data  <- lasso.lr[training.samples, ]
-test.data <- lasso.lr[-training.samples, ]
-
-# Dumy code categorical predictor variables
-x <- model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, train.data)[,-20]
-# Convert the outcome (class) to a numerical variable
-y <- ifelse(lasso.lr$y == "pos", 1, 0)
-
-# Find the best lambda using cross-validation
-set.seed(123) 
-cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
-# Fit the final model on the training data
-model <- glmnet(x, y, alpha = 1, family = "binomial",
-                lambda = cv.lasso$lambda.min)
-# Display regression coefficients
-coef(model)
-# Make predictions on the test data
-x.test <- model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, test.data)[,-1]
-probabilities <- model %>% predict(newx = x.test)
-predicted.classes <- ifelse(probabilities > 0.5, "pos", "neg")
-# Model accuracy
-observed.classes <- test.data$y
-mean(predicted.classes == observed.classes)
-legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
-```
-
--------------------------------------------------------------------------------
-
-## Elastic Net (DOES NOT WORK)
-```{r}
-set.seed(123)
-
-EN.lr <- fdata
-
-EN.lr$y <- as.numeric(as.factor(EN.lr$y))
-
-EN.train = EN.lr %>% sample_frac(0.5)
-
-EN.test = EN.lr %>% setdiff(EN.train)
-
-EN.x_train = model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, EN.train)[,-1]
-EN.x_test = model.matrix(y ~ job + marital + education + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed, EN.test)[,-1]
-
-
-# Set training control
-EN.train_cont <- trainControl(method = "repeatedcv",
-                              number = 10,
-                              repeats = 5,
-                              search = "random",
-                              verboseIter = TRUE)
-
-# Train the model
-elastic_reg <- train(y ~ .,
-                           data = EN.train,
-                           method = "glmnet",
-                           preProcess = c("center", "scale"),
-                           tuneLength = 10,
-                           trControl = EN.train_cont)
-
-
-# Best tuning parameter
-elastic_reg$bestTune
-
-# Coefficients
-coef(elastic_reg$finalModel, elastic_reg$bestTune$lambda)
-
-# Make predictions on the test data
-EN.predictions <- elastic_reg %>% predict(EN.test)
-# Model performance metrics
-Net.RMSE <- RMSE(EN.predictions, EN.test$y)
-Net.R2 <- R2(EN.predictions, EN.test$y)
-Net.RMSE
-Net.R2
-```
-
--------------------------------------------------------------------------------
-
-## Traditional Feature Selection on original data (AIC metric)
-```{r}
-set.seed(123)
-
-train.control <- trainControl(method = "cv", number = 10)
-
-#-------------------------------------------------------------------------------
-
-# Stepwise Model
-step.o.model <- train(y ~., data = odata,
-                    method = "lmStepAIC", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-step.o.model$results
-# Final model coefficients
-step.o.model$finalModel
-# Summary of the model
-summary(step.o.model$finalModel)
-step.o.adjr2 <- 0.1268
-
-#-------------------------------------------------------------------------------
-
-# Forward Model
-fwd.o.model <- train(y ~., data = odata,
-                    method = "leapForward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-fwd.o.model$results
-# Final model coefficients
-fwd.o.model$finalModel
-# Summary of the model
-summary(fwd.o.model$finalModel)
-fwd.o.adjr2 <- 0.1182
-
-#-------------------------------------------------------------------------------
-
-# Backward Model
-bck.o.model <- train(y ~., data = odata,
-                    method = "leapBackward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-bck.o.model$results
-# Final model coefficients
-bck.o.model$finalModel
-# Summary of the model
-summary(bck.o.model$finalModel)
-bck.o.adjr2 <- 0.1184
-```
-
-## Traditional Feature Selection on balanced data (AIC metric)
-```{r}
-set.seed(123)
-
-train.control <- trainControl(method = "cv", number = 10)
-
-#-------------------------------------------------------------------------------
-
-# Stepwise Model
-step.b.model <- train(y ~., data = bdata,
-                    method = "lmStepAIC", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-step.b.model$results
-# Final model coefficients
-step.b.model$finalModel
-# Summary of the model
-summary(step.b.model$finalModel)
-step.b.adjr2 <- 0.1494
-
-#-------------------------------------------------------------------------------
-
-# Forward Model
-fwd.b.model <- train(y ~., data = bdata,
-                    method = "leapForward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-fwd.b.model$results
-# Final model coefficients
-fwd.b.model$finalModel
-# Summary of the model
-summary(fwd.b.model$finalModel)
-fwd.b.adjr2 <- 0.1283
-
-#-------------------------------------------------------------------------------
-
-# Backward Model
-bck.b.model <- train(y ~., data = bdata,
-                    method = "leapBackward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-bck.b.model$results
-# Final model coefficients
-bck.b.model$finalModel
-# Summary of the model
-summary(bck.b.model$finalModel)
-bck.b.adjr2 <- 0.1357
-```
-
-## Traditional Feature Selection on rose data (AIC metric)
-```{r}
-set.seed(123)
-
-train.control <- trainControl(method = "cv", number = 10)
-
-#-------------------------------------------------------------------------------
-
-# Stepwise Model
-step.r.model <- train(y ~., data = rdata,
-                    method = "lmStepAIC", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-step.r.model$results
-# Final model coefficients
-step.r.model$finalModel
-# Summary of the model
-summary(step.r.model$finalModel)
-step.r.adjr2 <- 0.1334
-
-#-------------------------------------------------------------------------------
-
-# Forward Model
-fwd.r.model <- train(y ~., data = rdata,
-                    method = "leapForward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-fwd.r.model$results
-# Final model coefficients
-fwd.r.model$finalModel
-# Summary of the model
-summary(fwd.r.model$finalModel)
-fwd.r.adjr2 <- 0.1155
-
-#-------------------------------------------------------------------------------
-
-# Backward Model
-bck.r.model <- train(y ~., data = rdata,
-                    method = "leapBackward", 
-                    trControl = train.control,
-                    trace = FALSE
-                    )
-# Model accuracy
-bck.r.model$results
-# Final model coefficients
-bck.r.model$finalModel
-# Summary of the model
-summary(bck.r.model$finalModel)
-bck.r.adjr2 <- 0.1155
-```
-
--------------------------------------------------------------------------------
-
-## Logit with original data 97.38%
+## Logit with original data 89.69% (NEED INTERACTION TERMS OR NEW VARS)
 ```{r}
 set.seed(123)
 
 logit.o.data <- odata
-
 logit.o.data$y <- as.factor(logit.o.data$y)
 
 # Test & train
@@ -712,23 +518,38 @@ trainIndex <- createDataPartition(logit.o.data$y, p = .7,
 logit.o.Train <- logit.o.data[ trainIndex,]
 logit.o.Test  <- logit.o.data[-trainIndex,]
 
-logit.o.model <- glm(y ~ ., data = logit.o.Train, family = "binomial")
-summary(logit.o.model)
+# Build Full Model
+full.o.log<-glm(y ~ age + job + marital + education + contact + month + day_of_week + campaign + pdays + previous +
+         poutcome + cons.price.idx + cons.conf.idx, family="binomial",data=logit.o.Train)
 
-logit.o.Test$model_prob <- predict(logit.o.model, logit.o.Test, type = "response")
+# Step Model
+step.o.log<-full.o.log %>% stepAIC(trace=FALSE)
 
-logit.o.Test <- logit.o.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
-                                 bin1 = 1*(y == "Yes") + 0)
+# Model Summary
+summary(step.o.log)
 
-logit.o.Test <- logit.o.Test %>% mutate(accurate = 1*(model_pred == bin1))
-logit.o.acc <- sum(logit.o.Test$accurate)/nrow(logit.o.Test)
-logit.o.acc
+# Error Metrics
+step.o.aic <- step.o.log$aic
+step.o.aic
 
-vif(logit.o.model)
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.o.log), confint.default(step.o.log, level = 0.95)))
 
+# VIF Scores
+vif(step.o.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.o.log,newdata=logit.o.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.o.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.o.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.o.logit.acc
 ```
 
-## Logit with balanced data 62.78%
+## Logit with balanced data 69.99% (NEED INTERACTION TERMS OR NEW VARS)
 ```{r}
 set.seed(123)
 
@@ -743,22 +564,37 @@ trainIndex <- createDataPartition(logit.b.data$y, p = .7,
 logit.b.Train <- logit.b.data[ trainIndex,]
 logit.b.Test  <- logit.b.data[-trainIndex,]
 
-logit.b.model <- glm(y ~ ., data = logit.b.Train, family="binomial")
-summary(logit.b.model)
+# Build Full Model
+full.b.log<-glm(y~.,family="binomial",data=logit.b.Train)
 
-logit.b.Test$model_prob <- predict(logit.b.model, logit.b.Test, type = "response")
+# Step Model
+step.b.log<-full.b.log %>% stepAIC(trace=FALSE)
 
-logit.b.Test <- logit.b.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
-                                 bin1 = 1*(y == "Yes") + 0)
+# Model Summary
+summary(step.b.log)
 
-logit.b.Test <- logit.b.Test %>% mutate(accurate = 1*(model_pred == bin1))
-logit.b.acc <- sum(logit.b.Test$accurate)/nrow(logit.b.Test)
-logit.b.acc
+# Error Metrics
+step.b.aic <- step.b.log$aic
+step.b.aic
 
-vif(logit.b.model)
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.b.log), confint.default(step.b.log, level = 0.95)))
+
+# VIF Scores
+vif(step.b.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.b.log,newdata=logit.o.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.o.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.b.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.b.logit.acc
 ```
 
-## Logit with rose data 61.31%
+## Logit with rose data 68.46% (NEED INTERACTION TERMS OR NEW VARS)
 ```{r}
 set.seed(123)
 
@@ -773,22 +609,37 @@ trainIndex <- createDataPartition(logit.r.data$y, p = .7,
 logit.r.Train <- logit.r.data[ trainIndex,]
 logit.r.Test  <- logit.r.data[-trainIndex,]
 
-logit.r.model <- glm(y ~ ., data = logit.r.Train, family="binomial")
-summary(logit.r.model)
+# Build Full Model
+full.r.log<-glm(y~.,family="binomial",data=logit.r.Train)
 
-logit.r.Test$model_prob <- predict(logit.r.model, logit.r.Test, type = "response")
+# Step Model
+step.r.log<-full.r.log %>% stepAIC(trace=FALSE)
 
-logit.r.Test <- logit.r.Test  %>% mutate(model_pred = 1*(model_prob > .53) + 0,
-                                 bin1 = 1*(y == "Yes") + 0)
+# Model Summary
+summary(step.r.log)
 
-logit.r.Test <- logit.r.Test %>% mutate(accurate = 1*(model_pred == bin1))
-logit.r.acc <- sum(logit.r.Test$accurate)/nrow(logit.r.Test)
-logit.r.acc
+# Error Metrics
+step.r.aic <- step.r.log$aic
+step.r.aic
 
-vif(logit.r.model)
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.r.log), confint.default(step.r.log, level = 0.95)))
+
+# VIF Scores
+vif(step.r.log)
+
+# Predictions & Accuracy
+fit.pred.step<-predict(step.r.log,newdata=logit.o.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.o.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.r.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.r.logit.acc
 ```
 
--------------------------------------------------------------------------------
+# ------------------
 
 ## LDA with original data 89.83%
 ```{r}
@@ -891,7 +742,7 @@ lda.r.acc <- mean(lda.r.predictions$class==LDA.r.test.transformed$y)
 lda.r.acc
 ```
 
--------------------------------------------------------------------------------
+# ------------------
 
 ## QDA with original data 88.17%
 ```{r}
@@ -970,7 +821,368 @@ qda.r.acc <- mean(qda.r.predictions$class == QDA.r.test.data$y)
 qda.r.acc
 ```
 
--------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+## Ridge with original data 87.85%
+```{r}
+set.seed(123)
+
+ridge.o.lr <- odata
+
+ridge.o.lr$y <- as.numeric(as.factor(ridge.o.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.o.lr), 0.7*nrow(ridge.o.lr)) # indices for 70% training data
+ridge.o.train <- ridge.o.lr[ridge.Index, ] # training data
+ridge.o.test <- ridge.o.lr[-ridge.Index, ] # test data
+
+ridge.o.model <- linearRidge(y ~ ., data = ridge.o.train)
+
+summary(ridge.o.model)
+
+ridge.o.pred <- predict(ridge.o.model, ridge.o.test)  # predict on test data
+ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
+
+ridge.o.acc <- mean(apply(ridge.o.compare, 1, min)/apply(ridge.o.compare, 1, max)) 
+ridge.o.acc
+
+```
+
+## Ridge with balanced data 74.58%
+```{r}
+set.seed(123)
+
+ridge.b.lr <- bdata
+
+ridge.b.lr$y <- as.numeric(as.factor(ridge.b.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.b.lr), 0.7*nrow(ridge.b.lr)) # indices for 70% training data
+ridge.b.train <- ridge.b.lr[ridge.Index, ] # training data
+ridge.b.test <- ridge.b.lr[-ridge.Index, ] # test data
+
+ridge.b.model <- linearRidge(y ~ ., data = ridge.b.train)
+summary(ridge.b.model)
+
+ridge.b.pred <- predict(ridge.b.model, ridge.b.test)  # predict on test data
+ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
+
+ridge.b.acc <- mean(apply(ridge.b.compare, 1, min)/apply(ridge.b.compare, 1, max))
+ridge.b.acc
+```
+
+## Ridge with rose data 74.18%
+```{r}
+set.seed(123)
+
+ridge.r.lr <- rdata
+
+ridge.r.lr$y <- as.numeric(as.factor(ridge.r.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.r.lr), 0.7*nrow(ridge.r.lr)) # indices for 70% training data
+ridge.r.train <- ridge.r.lr[ridge.Index, ] # training data
+ridge.r.test <- ridge.r.lr[-ridge.Index, ] # test data
+
+ridge.r.model <- linearRidge(y ~ ., data = ridge.r.train)
+
+summary(ridge.r.model)
+
+ridge.r.pred <- predict(ridge.r.model, ridge.r.test)  # predict on test data
+ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
+
+ridge.r.acc <- mean(apply(ridge.r.compare, 1, min)/apply(ridge.r.compare, 1, max)) 
+ridge.r.acc
+```
+
+# -------------------------------------------------------------------------------
+
+## LASSO Regression original data 88.73%
+```{r}
+set.seed(123)
+
+lasso.o.lr <- odata
+lasso.o.lr$y <- as.factor(lasso.o.lr$y)
+
+training.samples <- lasso.o.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+lasso.o.train.data <- lasso.o.lr[training.samples, ]
+lasso.o.test.data <- lasso.o.lr[-training.samples, ]
+
+dat.o.train.x <- model.matrix(y~.,lasso.o.train.data)
+dat.o.train.y <- lasso.o.train.data[,14]
+
+cvfit <- cv.glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate is little below .1
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.o.model<-glmnet(dat.o.train.x, dat.o.train.y, family = "binomial",lambda=cvfit$lambda.min)
+
+dat.o.test.x<-model.matrix(y~.,lasso.o.test.data)
+fit.o.pred.lasso <- predict(lasso.o.model, newx = dat.o.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.o.lasso<-table(class.o.lasso,lasso.o.test.data$y)
+print("Confusion matrix for LASSO")
+conf.o.lasso
+
+#Accuracy 
+lasso.o.acc <- sum(diag(conf.o.lasso))/sum(conf.o.lasso)
+lasso.o.acc 
+```
+
+## LASSO Regression balanced data 60.04%
+```{r}
+set.seed(123)
+
+lasso.b.lr <- bdata
+lasso.b.lr$y <- as.factor(lasso.b.lr$y)
+
+training.samples <- lasso.b.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+lasso.b.train.data <- lasso.b.lr[training.samples, ]
+lasso.b.test.data <- lasso.b.lr[-training.samples, ]
+
+dat.b.train.x <- model.matrix(y~.,lasso.b.train.data)
+dat.b.train.y <- lasso.b.train.data[,14]
+
+cvfit <- cv.glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate is little below .1
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial",lambda=cvfit$lambda.min)
+
+dat.b.test.x<-model.matrix(y~.,lasso.b.test.data)
+fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.b.lasso<-table(class.b.lasso,lasso.b.test.data$y)
+print("Confusion matrix for LASSO")
+conf.b.lasso
+
+#Accuracy 
+lasso.b.acc <- sum(diag(conf.b.lasso))/sum(conf.b.lasso)
+lasso.b.acc 
+```
+
+## LASSO Regression Rose data 65.46%
+```{r}
+set.seed(123)
+
+lasso.r.lr <- rdata
+lasso.r.lr$y <- as.factor(lasso.r.lr$y)
+
+training.samples <- lasso.r.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+lasso.r.train.data <- lasso.r.lr[training.samples, ]
+lasso.r.test.data <- lasso.r.lr[-training.samples, ]
+
+dat.r.train.x <- model.matrix(y~.,lasso.r.train.data)
+dat.r.train.y <- lasso.r.train.data[,14]
+
+cvfit <- cv.glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate is little below .1
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.r.model<-glmnet(dat.r.train.x, dat.r.train.y, family = "binomial",lambda=cvfit$lambda.min)
+
+dat.r.test.x<-model.matrix(y~.,lasso.r.test.data)
+fit.r.pred.lasso <- predict(lasso.r.model, newx = dat.r.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.r.lasso<-table(class.r.lasso,lasso.r.test.data$y)
+print("Confusion matrix for LASSO")
+conf.r.lasso
+
+#Accuracy 
+lasso.r.acc <- sum(diag(conf.r.lasso))/sum(conf.r.lasso)
+lasso.r.acc 
+```
+
+# -------------------------------------------------------------------------------
+
+## Net Regression balanced data 66.63% (Giving weird accuracy metric... not sure)
+```{r}
+set.seed(123)
+
+net.o.lr <- odata
+net.o.lr$y <- as.factor(net.o.lr$y)
+
+training.samples <- net.o.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+net.o.train.data <- net.o.lr[training.samples, ]
+net.o.test.data <- net.o.lr[-training.samples, ]
+
+dat.o.train.x <- model.matrix(y~.,net.o.train.data)
+dat.o.train.y <- net.o.train.data[,14]
+
+cvfit <- cv.glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class",
+                   alpha = 0.5,  nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+
+#CV misclassification error rate
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit net using entire
+net.o.model<-glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
+
+dat.o.test.x<-model.matrix(y~.,net.o.test.data)
+fit.o.pred.net <- predict(net.o.model, newx = dat.o.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.o.net<-factor(ifelse(fit.o.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.o.net<-table(class.o.net,net.o.test.data$y)
+print("Confusion matrix for net")
+conf.o.net
+
+#Accuracy 
+net.o.acc <- sum(diag(conf.o.net))/sum(conf.o.net)
+net.o.acc 
+```
+
+## Net Regression balanced data 66.63%
+```{r}
+set.seed(123)
+
+net.b.lr <- bdata
+net.b.lr$y <- as.factor(net.b.lr$y)
+
+training.samples <- net.b.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+net.b.train.data <- net.b.lr[training.samples, ]
+net.b.test.data <- net.b.lr[-training.samples, ]
+
+dat.b.train.x <- model.matrix(y~.,net.b.train.data)
+dat.b.train.y <- net.b.train.data[,14]
+
+cvfit <- cv.glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", type.measure = "class",
+                   alpha = 0.5,  nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit net using entire
+net.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
+
+dat.b.test.x<-model.matrix(y~.,net.b.test.data)
+fit.b.pred.net <- predict(net.b.model, newx = dat.b.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.b.net<-factor(ifelse(fit.b.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.b.net<-table(class.b.net,net.b.test.data$y)
+print("Confusion matrix for net")
+conf.b.net
+
+#Accuracy 
+net.b.acc <- sum(diag(conf.b.net))/sum(conf.b.net)
+net.b.acc 
+```
+
+## Net Regression Rose data 65.89%
+```{r}
+set.seed(123)
+
+net.r.lr <- rdata
+net.r.lr$y <- as.factor(net.r.lr$y)
+
+training.samples <- net.r.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+net.r.train.data <- net.r.lr[training.samples, ]
+net.r.test.data <- net.r.lr[-training.samples, ]
+
+dat.r.train.x <- model.matrix(y~.,net.r.train.data)
+dat.r.train.y <- net.r.train.data[,14]
+
+cvfit <- cv.glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", type.measure = "class",
+                   alpha = 0.5,  nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit net using entire
+net.r.model<-glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
+
+dat.r.test.x<-model.matrix(y~.,net.r.test.data)
+fit.r.pred.net <- predict(net.r.model, newx = dat.r.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.r.net<-factor(ifelse(fit.r.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
+
+#Confusion Matrix 
+conf.r.net<-table(class.r.net,net.r.test.data$y)
+print("Confusion matrix for net")
+conf.r.net
+
+#Accuracy 
+net.r.acc <- sum(diag(conf.r.net))/sum(conf.r.net)
+net.r.acc 
+```
+
+# -------------------------------------------------------------------------------
 
 ## MDA with original data 88.69%
 ```{r}
@@ -1041,7 +1253,7 @@ mda.r.acc <- mean(mda.r.predicted.classes == MDA.r.test.data$y)
 mda.r.acc
 ```
 
--------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 
 ## FDA with original data 89.83%
 ```{r}
@@ -1109,7 +1321,7 @@ fda.r.acc <- mean(fda.r.predicted.classes == FDA.r.test.data$y)
 fda.r.acc
 ```
 
--------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 
 ## RDA with original data 89.85%
 ```{r}
@@ -1177,7 +1389,7 @@ rda.r.acc <- mean(rda.r.predictions$class == RDA.r.test.data$y)
 rda.r.acc
 ```
 
--------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 
 ## RF with original data 89.73% & 2 mtry
 ```{r}
@@ -1272,18 +1484,16 @@ rf.r.acc <- max(rf.r.model$results$Accuracy)
 rf.r.acc
 ```
 
--------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 
-## Results table
+## Accuracy table
 ```{r}
-SLR.results <- cbind(simple.o.acc, simple.b.acc, simple.r.acc)
+SIM.results <- cbind(simple.o.acc, simple.b.acc, simple.r.acc)
+SLR.results <- cbind(step.os.logit.acc, step.bs.logit.acc, step.rs.logit.acc)
+CLR.results <- cbind(step.o.logit.acc, step.b.logit.acc, step.r.logit.acc)
 RR.results <- cbind(ridge.o.acc, ridge.b.acc, ridge.r.acc)
-#LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
-#EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
-STEP.results <- cbind(step.o.adjr2, step.b.adjr2, step.r.adjr2)
-FWD.results <- cbind(fwd.o.adjr2, fwd.b.adjr2, fwd.r.adjr2) 
-BCK.results <- cbind(bck.o.adjr2, bck.b.adjr2, bck.r.adjr2)
-LR.results <- cbind(logit.o.acc, logit.b.acc, logit.r.acc)
+LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
+EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
 LDA.results <- cbind(lda.o.acc, lda.b.acc, lda.r.acc)
 QDA.results <- cbind(qda.o.acc, qda.b.acc, qda.r.acc)
 MDA.results <- cbind(mda.o.acc, mda.b.acc, mda.r.acc)
@@ -1291,16 +1501,39 @@ FDA.results <- cbind(fda.o.acc, fda.b.acc, fda.r.acc)
 RDA.results <- cbind(rda.o.acc, rda.b.acc, rda.r.acc)
 RF.results <- cbind(rf.o.acc, rf.b.acc, rf.r.acc)
 
-results <- rbind(SLR.results, RR.results, STEP.results, 
-                 FWD.results, BCK.results, LR.results,
-                 LDA.results, QDA.results, MDA.results,
-                 FDA.results, RDA.results, RF.results)
+accuracy <- rbind(SIM.results, SLR.results, CLR.results, RR.results, 
+                  LSO.results, EN.results, LDA.results, QDA.results, MDA.results,
+                  FDA.results, RDA.results, RF.results)
 
-colnames(results) <- c("Unbalanded", "Under-balanced", "Rose Balanced")
-row.names(results) <- c("Simple LR", "Ridge",
-                        "Stewpise (AdjR2)", "Backward (AdjR2)", 
-                        "Forward (AdjR2)",  "Logistic", "LDA", "QDA",
-                        "MDA", "FDA", "RDA", "Random Forest")
-formattable(results)
+colnames(accuracy) <- c("Unbalanced (Original)", "Under-balanced (9280)", "Rose-Balanced")
+row.names(accuracy) <- c("Simple Regression","Stepwise Logistic", "Complex Logistic", 
+                         "Ridge Regression", "Lasso Regression","Elastic Net","Linear Discrim", 
+                         "Quadratic Discrim", "Multiple Discrim", "Functional Discrim", 
+                         "Redundancy Analysis", "Random Forest")
+accuracy
 ```
 
+## AIC table
+```{r}
+SIM.aic.results <- cbind(simple.o.aic, simple.b.aic, simple.r.aic)
+SLR.aic.results <- cbind(step.os.aic, step.bs.aic, step.rs.aic)
+CLR.aic.results <- cbind(step.o.aic, step.b.aic, step.r.aic)
+#RR.results <- cbind(ridge.o.acc, ridge.b.acc, ridge.r.acc)
+#LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
+#EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
+#FWD.results <- cbind(fwd.o.adjr2, fwd.b.adjr2, fwd.r.adjr2) 
+#BCK.results <- cbind(bck.o.adjr2, bck.b.adjr2, bck.r.adjr2)
+LDA.results <- cbind(lda.o.acc, lda.b.acc, lda.r.acc)
+QDA.results <- cbind(qda.o.acc, qda.b.acc, qda.r.acc)
+#MDA.results <- cbind(mda.o.acc, mda.b.acc, mda.r.acc)
+#FDA.results <- cbind(fda.o.acc, fda.b.acc, fda.r.acc)
+#RDA.results <- cbind(rda.o.acc, rda.b.acc, rda.r.acc)
+#RF.results <- cbind(rf.o.acc, rf.b.acc, rf.r.acc)
+
+aic.table <- rbind(SIM.aic.results, LR.aic.results, CLR.aic.results)
+
+colnames(aic.table) <- c("Unbalanced", "Under-balanced", "Rose-Balanced")
+row.names(aic.table) <- c("Simple Regression", "Stepwise Logistic", "Complex Logistic")
+aic.table
+
+```
