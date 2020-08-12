@@ -47,6 +47,8 @@ library(ggplot2)
 library(RColorBrewer)
 library(corrplot)
 library(reshape2)
+library(smotefamily)
+library(DMwR)
 library(pls)
 library(bestNormalize)
 library(ResourceSelection)
@@ -207,8 +209,6 @@ BNNREmp
 # Objective 1 - Simple Logistic Regression
 ## Logit - Data splitting
 ```{r}
-library(smotefamily)
-library(DMwR)
 ## Splitting and Down Sampling
 dim(imputed)
 prop.table(table(imputed$y))
@@ -944,6 +944,18 @@ simple.o.sens
 simple.o.spec <- (10858)/(10858+1101)
 simple.o.spec
 
+# MisCalc Rates
+simple.o.misc <- mean(simple.o.pred != simple.o.test$y)
+
+# Roc Curves & value
+p <- predict(simple.o.lm , newdata=simple.o.test, type="response")
+pr <- prediction(p, simple.o.test$y)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+simple.o.auc <- performance(pr, measure = "auc")
+simple.o.auc <- simple.o.auc@y.values[[1]]
+simple.o.auc
+
 vif(simple.o.lm)
 ```
 ## Simple with balanced data 84.09%
@@ -1007,6 +1019,19 @@ simple.b.sens
 simple.b.spec <- (837)/(837+515)
 simple.b.spec
 
+# MisCalc Rates
+simple.b.misc <- mean(simple.b.pred != simple.b.test$y)
+
+
+# Roc Curves & value
+p <- predict(simple.b.lm , newdata=simple.b.test, type="response")
+pr <- prediction(p, simple.b.test$y)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+simple.b.auc <- performance(pr, measure = "auc")
+simple.b.auc <- simple.b.auc@y.values[[1]]
+simple.b.auc
+
 vif(simple.b.lm)
 ```
 ## Simple with rose data 83.28
@@ -1054,6 +1079,19 @@ simple.r.sens <- (7380)/(7380+3625)
 simple.r.sens
 simple.r.spec <- (845)/(845+507)
 simple.r.spec
+
+# MisCalc Rates
+simple.r.misc <- mean(simple.r.pred != simple.r.test$y)
+simple.r.misc
+
+# Roc Curves & value
+p <- predict(simple.r.lm , newdata=simple.r.test, type="response")
+pr <- prediction(p, simple.r.test$y)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+simple.r.auc <- performance(pr, measure = "auc")
+simple.r.auc <- simple.r.auc@y.values[[1]]
+simple.r.auc
 
 vif(simple.r.lm)
 ```
@@ -1299,8 +1337,8 @@ qda.b.cm <- caret::confusionMatrix(as.factor(qda.b.predictions$class), as.factor
 qda.b.cm
 
 # Model accuracy
-qda.o.acc <- 0.8712
-qda.o.acc
+qda.b.acc <- 0.8712
+qda.b.acc
 
 # Sensitivity and Specificity
 qda.b.sens <- 0.9127
@@ -1337,8 +1375,8 @@ qda.r.cm <- caret::confusionMatrix(as.factor(qda.r.predictions$class), as.factor
 qda.r.cm
 
 # Model accuracy
-qda.o.acc <- 0.876
-qda.o.acc
+qda.r.acc <- 0.876
+qda.r.acc
 
 # Sensitivity and Specificity
 qda.r.sens <- 0.9269
@@ -2018,13 +2056,13 @@ ridge.r.cm <- caret::confusionMatrix(as.factor(ridge.r.pred), as.factor(ridge.r.
 ridge.r.cm
 
 # Model accuracy
-ridge.r.acc <- 0.6586
+ridge.r.acc <- 0.6658
 ridge.r.acc
 
 # Sensitivity and Specificity
-ridge.r.sens <- 0.6611
+ridge.r.sens <- 0.6708
 ridge.r.sens
-ridge.r.spec <- 0.6390
+ridge.r.spec <- 0.6250
 ridge.r.spec
 ```
 
@@ -2128,10 +2166,9 @@ cvfit$lambda.min
 lasso.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial",lambda=cvfit$lambda.min, type.measure = "class", nlambda = 1001)
 
 dat.b.test.x<-model.matrix(y~.,lasso.b.test.data)
-fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response", type = "response", s = cvfit$lambda.min, exact = FALSE)
+fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response", s = cvfit$lambda.min)
 
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models
 cutoff<-0.5
 class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"yes","no"))
 
@@ -2140,13 +2177,13 @@ lasso.b.cm <- caret::confusionMatrix(as.factor(class.b.lasso), as.factor(lasso.b
 lasso.b.cm
 
 # Model accuracy
-lasso.b.acc <- 0.6571
+lasso.b.acc <- 0.6696
 lasso.b.acc
 
 # Sensitivity and Specificity
-lasso.b.sens <- 0.6649
+lasso.b.sens <- 0.6733
 lasso.b.sens
-lasso.b.spec <- 0.5955
+lasso.b.spec <- 0.6401
 lasso.b.spec
 ```
 ## LASSO Regression Rose data 82.74
@@ -2260,7 +2297,7 @@ net.o.sens
 net.o.spec <- 0.1605
 net.o.spec
 ```
-## Net Regression balanced data 89.81%
+## Net Regression balanced data 68.34%
 ```{r}
 set.seed(123)
 
@@ -2385,13 +2422,13 @@ net.r.cm <- caret::confusionMatrix(net.r.pred, as.factor(y_test))
 net.r.cm
 
 # Model accuracy
-net.r.acc <- 0.6825
+net.r.acc <- 0.6799
 net.r.acc
 
 # Sensitivity and Specificity
-net.r.sens <- 0.6894
+net.r.sens <- 0.6861
 net.r.sens
-net.r.spec <- 0.6265
+net.r.spec <- 0.6294
 net.r.spec
 ```
 
@@ -2428,9 +2465,9 @@ cm = as.matrix(table(default_cl, knn.o.model))
 
 ## Objective 2 Results
 ```{r}
-SR.O.results <- cbind("Simple LR Original",simple.o.acc, simple.o.sens, simple.o.spec)
-SR.B.results <- cbind("Simple LR Balanced",simple.b.acc, simple.b.sens, simple.b.spec)
-SR.R.results <- cbind("Simple LR Rose",simple.r.acc, simple.r.sens, simple.r.spec)
+SR.O.results <- cbind("Simple LR Original",simple.o.acc, simple.o.sens, simple.o.spec, simple.o.misc, simple.o.auc)
+SR.B.results <- cbind("Simple LR Balanced",simple.b.acc, simple.b.sens, simple.b.spec, simple.b.misc, simple.b.auc)
+SR.R.results <- cbind("Simple LR Rose",simple.r.acc, simple.r.sens, simple.r.spec, simple.r.misc, simple.r.auc)
 LDA.O.results <- cbind("LDA Original",lda.o.acc, lda.o.sens, lda.o.spec)
 LDA.B.results <- cbind("LDA Balanced",lda.b.acc, lda.b.sens, lda.b.spec)
 LDA.R.results <- cbind("LDA Rose",lda.r.acc, lda.r.sens, lda.r.spec)
@@ -2470,7 +2507,7 @@ accuracy <- rbind(SR.O.results, SR.B.results, SR.R.results,
                   NET.O.results, NET.B.results, NET.R.results,
                   RF.O.results, RF.B.results, RF.R.results)
 
-colnames(accuracy) <- c("Method","Accuracy", "Sensitivity", "Specificity")
+colnames(accuracy) <- c("Method", "Accuracy", "Sensitivity", "Specificity", "Misclassification Rate", "AUC")
 
 accuracytbl <- as.data.frame(accuracy)
 accuracytbl$Accuracy <- as.numeric(accuracytbl$Accuracy)
