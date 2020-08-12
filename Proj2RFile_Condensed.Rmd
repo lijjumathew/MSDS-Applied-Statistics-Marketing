@@ -2328,3 +2328,472 @@ formattable(accuracytbl,
                  "Specificity" = color_text(customRed, customGreen)))
 ```
 
+
+
+
+
+
+```{r}
+library(smotefamily)
+library(DMwR)
+## Splitting and Down Sampling
+dim(imputed)
+prop.table(table(imputed$y))
+imputed$y <- as.factor(imputed$y)
+set.seed(1234)
+training.samples <- imputed$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+train <- imputed[training.samples, ]
+test <- imputed[-training.samples, ]
+table(train$y)
+prop.table(table(train$y))
+table(test$y)
+prop.table(table(test$y))
+# 50-50 down sampling
+train_down_s_50 <- SMOTE(form = y~.,data = train, k = 5, perc.over = 100)
+attach(train_down_s_50)
+table(train_down_s_50$y)
+prop.table(table(train_down_s_50$y))
+# 60-40 down sampling
+train_bal_s_60 <- SMOTE(form = y~.,data = train, k = 5, perc.over = 390)
+table(train_bal_s_60$y)
+prop.table(table(train_bal_s_60$y))
+# Ovun down sampling
+train_bal_o <-ovun.sample(y ~ .,data = train, method = "under", N = 9280)$data
+table(train_bal1$y)
+prop.table(table(train_bal1$y))
+# ROSE Down sampling
+train_bal_r <- ROSE(y ~ ., data = train)$data
+table(train_bal_r$y)
+prop.table(table(train_bal_r$y))
+```
+
+## Logit - Full Model - Original data 90.8%
+```{r}
+set.seed(1234)
+logit.os.Train <- train
+logit.os.Test <- test
+logit.os.data$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+full.os.log<-glm(y~.,family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log<-full.os.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.os.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+```
+
+## Logit - Full Model - SMOTE 50- 50 Sampled data 86.6%
+```{r}
+set.seed(1234)
+logit.os.Train <- train_down_s_50
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+attach(logit.os.Train)
+# Build Full Model
+full.os.log<-glm(y~.,family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log<-full.os.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.os.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+```
+
+## Logit - Full Model - SMOTE 60- 40 Sampled data 88.6%
+```{r}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+attach(logit.os.Train)
+# Build Full Model
+full.os.log<-glm(y~.,family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log<-full.os.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.os.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+```
+
+## Logit - Full Model - ROSE 85.5%
+```{r}
+set.seed(1234)
+logit.os.Train <- train_bal_r
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+attach(logit.os.Train)
+# Build Full Model
+full.os.log<-glm(y~.,family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log<-full.os.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+conf.step<-table(class.step,logit.os.Test$y)
+print("Confusion matrix for Stepwise")
+conf.step
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+```
+
+
+
+
+
+1. Using SMOTE 60-40 sampled data as the train data
+2. From the full model and the significant predictors from step wise model and taking into account the correlated predictors
+   below are the some of the models.
+
+## Logit - Reduced Model 7(job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
+## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.157332
+```{r reduced model 7}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff <- 0.5
+class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+confusionMatrix(as.factor(class.step), logit.os.Test$y)
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+# Metrics
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.sens <- sensitivity(class.step, logit.os.Test$y,threshold = cutoff)
+step.os.logit.spec <- specificity(class.step,logit.os.Test$y,threshold = cutoff)
+
+# Roc Curves & value
+p <- predict(step.os.log, newdata=logit.os.Test, type="response")
+pr <- prediction(p, logit.os.Test$y)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+plot(prf,
+     main = "ROC Curve 
+ AUC = 0.7119",
+     col = "blue")
+```
+
+## Logit - Reduced Model 1(job,month,campaign,pdays,poutcome,emp.var.rate,cons.price.idx) 
+## Accuracy - 81.1%, Sensitivity - 84.9, Specificity - 50.9, MC - 0.188653
+```{r reduced model 1}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+attach(logit.os.Train)
+# Build Full Model
+red.mod1.log <- glm(y~ job + month + campaign + pdays + poutcome + emp.var.rate + cons.price.idx ,family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod1.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test, type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+confusionMatrix(as.factor(class.step),logit.os.Test$y)
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
+## Logit - Reduced Model 2(age,job,contact,day_of_week,campaign,pdays,poutcome,emp.var.rate,nr.employed)
+## Accuracy - 79.3%, Sensitivity - 83.6, Specificity - 45.7, MC - 0.206863
+```{r reduced model 2}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod2.log <- glm(y ~ age + job + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + nr.employed , family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod2.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+confusionMatrix(as.factor(class.step),logit.os.Test$y)
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
+## Logit - Reduced Model 4(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m)
+## Accuracy - 77.2%, Sensitivity - 81.7, Specificity - 41.8, MC - 0.228229
+```{r reduced model 4}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod4.log <- glm(y ~ job + contact + day_of_week + campaign + pdays + poutcome + euribor3m , family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod4.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+confusionMatrix(as.factor(class.step),logit.os.Test$y)
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
+## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
+## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.192780
+```{r reduced model 6}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod6.log <- glm(y ~ job + education  +  campaign  + poutcome + nr.employed , family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod6.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+confusionMatrix(as.factor(class.step), logit.os.Test$y)
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
+## Logit - Reduced Model 3(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
+## Accuracy - 79.99%, Sensitivity - 84.3, Specificity - 45.7, VIF ISSUES
+```{r reduced model 3}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod3.log <- glm(y ~ job + contact + day_of_week + campaign + pdays + poutcome + euribor3m + nr.employed , family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod3.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+confusionMatrix(as.factor(class.step),logit.os.Test$y)
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
+## Logit - Reduced Model 5(job,contact,education,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
+## Accuracy - 80.1%, Sensitivity - 84.5, Specificity - 45.1, VIF ISSUES
+```{r reduced model 5}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+# Build Full Model
+red.mod5.log <- glm(y ~ job + education + contact + day_of_week + campaign + pdays + poutcome + euribor3m + nr.employed , family="binomial",data=logit.os.Train)
+# Step Model
+step.os.log <- red.mod5.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+confusionMatrix(as.factor(class.step),logit.os.Test$y)
+
+
+step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
+step.os.logit.acc
+print("Sensitivity")
+sensitivity(class.step,logit.os.Test$y,threshold = cutoff)
+print("Specificity")
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
+```
+
