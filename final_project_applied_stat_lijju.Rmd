@@ -697,7 +697,12 @@ set.seed(1234)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
+summary(logit.os.Test)
+str(logit.os.Test)
+summary(test)
+
 logit.os.Test <- test
+logit.os.Test$y <- as.factor(logit.os.Test$y)
 logit.os.Train$y <- as.factor(logit.os.Train$y)
 # Build Full Model
 red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
@@ -719,25 +724,28 @@ exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level =
 vif(step.os.log)
 
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step <- as.numeric(predict(step.os.log,newdata=logit.os.Test,type="response"))
 cutoff <- 0.5
-class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
+class.step <- as.factor(ifelse(fit.pred.step > cutoff,"yes","no"))
 conf.step <- table(class.step,logit.os.Test$y)
+confusionMatrix(as.factor(class.step) , logit.os.Test$y)
 print("Confusion matrix for Stepwise")
 conf.step
 step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.os.logit.acc
 print("Sensitivity")
-sensitivity(class.step, logit.os.Test$y,threshold = cutoff)
+sensitivity(class.step, logit.os.Test$y, threshold = cutoff)
 print("Specificity")
 specificity(class.step,logit.os.Test$y,threshold = cutoff)
 plotROC(logit.os.Test$y, fit.pred.step)
 
+str(class.step)
+str(logit.os.Test$y)
 
-confusionMatrix(data=class.step , reference=logit.os.Test$y)
 
 library(ROCR)
 pr <- prediction(fit.pred.step, logit.os.Test$y)
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 plot(prf)
+
 ```

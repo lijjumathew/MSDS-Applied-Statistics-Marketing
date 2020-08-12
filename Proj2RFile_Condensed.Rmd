@@ -39,7 +39,7 @@ library(klaR)
 library(aod)
 library(ggfortify)
 library(factoextra)
-library(rgl)
+#library(rgl)
 library(tree)
 library(randomForest)
 library(ridge)
@@ -52,13 +52,14 @@ library(DMwR)
 library(pls)
 library(bestNormalize)
 library(ResourceSelection)
+library(ROCR)
 ```
 
 ## Load in dataset and look at data
 ```{r}
 # import data
 datain <- read.csv("D:/MS Data Science/SMU/6372 - Applied Stats/Project 2/bank-additional-full.csv", header = TRUE)
-
+#datain <- read.csv('/Users/lijjumathew/Library/Mobile Documents/com~apple~CloudDocs/Lijju/SMU/Courses/Applied Statistics/Project/Project2/bank-additional-full.csv', sep=";", header=TRUE)
 # View data
 str(datain)
 summary(datain)
@@ -421,10 +422,8 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-plot(prf,
-     main = "ROC Curve 
- AUC = 0.7119",
-     col = "blue")
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+
 ```
 
 ## Logit - Reduced Model 1(job,month,campaign,pdays,poutcome,emp.var.rate,cons.price.idx) 
@@ -474,14 +473,11 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-plot(prf,
-     main = "ROC Curve 
- AUC = 0.72069",
-     col = "blue")
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
 ## Logit - Reduced Model 2(age,job,contact,day_of_week,campaign,pdays,poutcome,emp.var.rate,nr.employed)
-## Accuracy - 79.3%, Sensitivity - 83.6, Specificity - 45.7, MC - 0.206863, AUC - 0.6961
+## Accuracy - 79.3%, Sensitivity - 85.3, Specificity - 43.5, MC - 0.206863, AUC - 0.7011984
 ```{r reduced model 2}
 set.seed(1234)
 logit.os.Train <- train_bal_s_60
@@ -526,14 +522,11 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-plot(prf,
-     main = "ROC Curve 
- AUC = 0.69616",
-     col = "blue")
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
 ## Logit - Reduced Model 4(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m)
-## Accuracy - 77.2%, Sensitivity - 81.7, Specificity - 41.8, MC - 0.228229, AUC - 0.6792
+## Accuracy - 80.5%, Sensitivity - 85.4, Specificity - 42.03, MC - 0.1947232, AUC - 0.6911033
 ```{r reduced model 4}
 set.seed(1234)
 logit.os.Train <- train_bal_s_60
@@ -578,10 +571,7 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-plot(prf,
-     main = "ROC Curve 
- AUC = 0.6792729",
-     col = "blue")
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
 ## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
@@ -631,10 +621,7 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-plot(prf,
-     main = "ROC Curve 
- AUC = 0.73874",
-     col = "blue")
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
 ## Logit - Reduced Model 3(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
