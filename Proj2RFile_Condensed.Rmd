@@ -48,6 +48,7 @@ library(corrplot)
 library(reshape2)
 library(pls)
 library(bestNormalize)
+library(ResourceSelection)
 ```
 
 ## Load in dataset and look at data
@@ -93,6 +94,7 @@ datain$housing <- as.factor(datain$housing)
 datain$loan <- as.factor(datain$loan)
 datain$contact <- as.factor(datain$contact)
 datain$month <- sapply(datain$month,function(x) grep(paste("(?i)",x,sep=""),month.abb))
+datain$month <- as.factor(datain$month)
 datain$day_of_week <- dplyr::recode(datain$day_of_week, 
        "mon"="1",
        "tue"="2",
@@ -125,14 +127,16 @@ imputed$education <- as.numeric(imputed$education)
 imputed$default <- as.numeric(imputed$default)
 imputed$housing <- as.numeric(imputed$housing)
 imputed$loan <- as.numeric(imputed$loan)
+imputed$month <- as.numeric(imputed$month)
 imputed$contact <- as.numeric(imputed$contact)
 imputed$poutcome <- as.numeric(imputed$poutcome)
 imputed$day_of_week <- as.numeric(imputed$day_of_week)
+
+EDAD <- imputed
 ```
 
 ## EDA (don't bulk run. Open and pick plot)
 ```{r}
-EDAD <- imputed
 EDAD$y <- as.factor(EDAD$y)
 EDAD$y <- as.numeric(EDAD$y)
 
@@ -197,6 +201,7 @@ BNNREmp
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 # Objective 1 - Simple Logistic Regression
 ## Final Datasets to be used in objective 1
@@ -212,25 +217,544 @@ edadata <- edadata %>%
   select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
          poutcome, cons.price.idx, cons.conf.idx, y)
 
-# Original unbalanced dataset
-odata <- edadata 
-
-# Balanced dataset using under weighting
-bdata <-ovun.sample(y ~ .,data = edadata, method = "under", N = 9280)$data
-prop.table(table(bdata$y))
-
-# Balanced using ROSE package
-rdata <- ROSE(y ~ ., data = edadata)$data
-prop.table(table(rdata$y))
+obj1.data <- edadata
 ```
-
-# ----------------------
 
 ## Logit with original data 89.69%
 ```{r}
 set.seed(123)
 
-logit.os.data <- odata
+logit.os.data <- obj1.data
+logit.os.data$y <- as.factor(logit.os.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.os.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.os.Train <- logit.os.data[ trainIndex,]
+logit.os.Test  <- logit.os.data[-trainIndex,]
+
+# Build Full Model
+full.os.log <- glm( y ~ .,family = binomial(link="logit"),data=logit.os.Train)
+
+# Forward Model
+fwd.os.log <- step(full.os.log,
+     direction="forward",
+     data=logit.os.Train)
+
+# Backward Model
+bck.os.log <- step(full.os.log,
+     direction="backward",
+     data=logit.os.Train)
+
+# Stepwise Model
+step.os.log <- step(full.os.log,
+     direction="both",
+     data=logit.os.Train)
+
+# Model Fit
+hoslem.test(step.os.log$y, fitted(step.os.log), g=14)
+hoslem.test(fwd.os.log$y, fitted(fwd.os.log), g=14)
+hoslem.test(bck.os.log$y, fitted(bck.os.log), g=14)
+
+# Model Plots
+#plot(fwd.os.log)
+
+# Model Summary
+summary(step.os.log)
+summary(fwd.os.log)
+summary(bck.os.log)
+
+# Error Metrics
+step.os.aic <- step.os.log$aic
+fwd.os.aic <- fwd.os.log$aic
+bck.os.aic <- bck.os.log$aic
+
+# Confidence Intervals
+step.os.ci <- exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+fwd.os.ci <- exp(cbind("Odds ratio" = coef(fwd.os.log), confint.default(fwd.os.log, level = 0.95)))
+bck.os.ci <- exp(cbind("Odds ratio" = coef(bck.os.log), confint.default(bck.os.log, level = 0.95)))
+
+# VIF Scores
+step.os.vif <- vif(step.os.log)
+fwd.os.vif <- vif(fwd.os.log)
+bck.os.vif <- vif(bck.os.log)
+
+# Predictions & Accuracy - Stepwise
+cutoff <- 0.5
+fit.pred.os.step <- predict(step.os.log,newdata=logit.os.Test,type="response")
+class.os.step <- factor(ifelse(fit.pred.os.step>cutoff,"yes","no"))
+step.os.cm <- confusionMatrix(class.os.step, logit.os.Test$y)
+step.os.cm
+
+step.os.logit.acc <- 0.8969
+step.os.logit.sens <- 0.9882
+step.os.logit.spec <- 0.1774
+
+# Predictions & Accuracy - Forward
+cutoff <- 0.5
+fit.pred.os.fwd <- predict(fwd.os.log,newdata=logit.os.Test,type="response")
+class.os.fwd <- factor(ifelse(fit.pred.os.fwd>cutoff,"yes","no"))
+fwd.os.cm <- confusionMatrix(class.os.fwd, logit.os.Test$y)
+fwd.os.cm
+
+fwd.os.logit.acc <- 0.8969
+fwd.os.logit.sens <- 0.9882
+fwd.os.logit.spec <- 0.1774
+
+# Predictions & Accuracy - Backward
+cutoff <- 0.5
+fit.pred.os.bck <- predict(bck.os.log,newdata=logit.os.Test,type="response")
+class.os.bck <- factor(ifelse(fit.pred.os.bck>cutoff,"yes","no"))
+bck.os.cm <- confusionMatrix(class.os.bck, logit.os.Test$y)
+bck.os.cm
+
+bck.os.logit.acc <- 0.8969
+bck.os.logit.sens <- 0.9882
+bck.os.logit.spec <- 0.1774
+
+# SLR Table
+slr.os.acc <- rbind(step.os.logit.acc, fwd.os.logit.acc, bck.os.logit.acc)
+slr.os.aics <- rbind(step.os.aic, fwd.os.aic, bck.os.aic)
+slr.os.sens <- rbind(step.os.logit.sens, fwd.os.logit.sens, bck.os.logit.sens)
+slr.os.spec <- rbind(step.os.logit.spec, fwd.os.logit.spec, bck.os.logit.spec)
+slr.os.results <- cbind(slr.os.acc, slr.os.aics, slr.os.sens, slr.os.spec)
+colnames(slr.os.results) <- c("Accuracy", "AIC", "Sensitivity", "Specificity")
+rownames(slr.os.results) <- c("Stepwise", "Forward", "Backward")
+slr.os.results
+```
+## Logit with balanced data 69.47
+```{r}
+set.seed(123)
+
+logit.bs.data <- obj1.data
+logit.bs.data$y <- as.factor(logit.os.data$y)
+
+# Train Index
+trainIndex <- createDataPartition(logit.bs.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj1.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj1.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.factor(balanced_split_data$y)
+
+# Generate train/test datasets
+logit.bs.Train <- balanced_split_data
+logit.bs.Test  <- logit.bs.data[-trainIndex,]
+
+# Build Full Model
+full.bs.log <- glm( y ~ .,family = binomial(link="logit"),data=logit.bs.Train)
+
+# Forward Model
+fwd.bs.log <- step(full.bs.log,
+     direction="forward",
+     data=logit.bs.Train)
+
+# Backward Model
+bck.bs.log <- step(full.bs.log,
+     direction="backward",
+     data=logit.bs.Train)
+
+# Stepwise Model
+step.bs.log <- step(full.bs.log,
+     direction="both",
+     data=logit.bs.Train)
+
+# Model Fit
+hoslem.test(step.bs.log$y, fitted(step.bs.log), g=14)
+hoslem.test(fwd.bs.log$y, fitted(fwd.bs.log), g=14)
+hoslem.test(bck.bs.log$y, fitted(bck.bs.log), g=14)
+
+# Model Plots
+#plot(fwd.bs.log)
+
+# Model Summary
+summary(step.bs.log)
+summary(fwd.bs.log)
+summary(bck.bs.log)
+
+# Error Metrics
+step.bs.aic <- step.bs.log$aic
+fwd.bs.aic <- fwd.bs.log$aic
+bck.bs.aic <- bck.bs.log$aic
+
+# Confidence Intervals
+step.bs.ci <- exp(cbind("Odds ratio" = coef(step.bs.log), confint.default(step.bs.log, level = 0.95)))
+fwd.bs.ci <- exp(cbind("Odds ratio" = coef(fwd.bs.log), confint.default(fwd.bs.log, level = 0.95)))
+bck.bs.ci <- exp(cbind("Odds ratio" = coef(bck.bs.log), confint.default(bck.bs.log, level = 0.95)))
+
+# VIF Scores
+step.bs.vif <- vif(step.bs.log)
+fwd.bs.vif <- vif(fwd.bs.log)
+bck.bs.vif <- vif(bck.bs.log)
+
+# Predictions & Accuracy - Stepwise
+cutoff <- 0.5
+fit.pred.bs.step <- predict(step.bs.log,newdata=logit.bs.Test,type="response")
+class.bs.step <- factor(ifelse(fit.pred.bs.step>cutoff,"yes","no"),levels=c("no","yes"))
+conf.bs.step <- table(class.bs.step,logit.bs.Test$y)
+print("Confusion matrix for Stepwise")
+conf.bs.step
+
+step.bs.logit.acc <- sum(diag(conf.bs.step))/sum(conf.bs.step)
+step.bs.logit.sens <- (7705)/(7705+513)
+step.bs.logit.spec <- (879)/(879+3259)
+
+# Predictions & Accuracy - Forward
+cutoff <- 0.5
+fit.pred.bs.fwd <- predict(fwd.bs.log,newdata=logit.bs.Test,type="response")
+class.bs.fwd <- factor(ifelse(fit.pred.bs.fwd>cutoff,"yes","no"),levels=c("no","yes"))
+conf.bs.fwd <- table(class.bs.fwd,logit.bs.Test$y)
+print("Confusion matrix for Forward")
+conf.bs.fwd
+
+fwd.bs.logit.acc <- sum(diag(conf.bs.fwd))/sum(conf.bs.fwd)
+fwd.bs.logit.sens <- (7718)/(7718+516)
+fwd.bs.logit.spec <- (876)/(879+3246)
+
+# Predictions & Accuracy - Backward
+cutoff <- 0.5
+fit.pred.bs.bck <- predict(bck.bs.log,newdata=logit.bs.Test,type="response")
+class.bs.bck <- factor(ifelse(fit.pred.bs.bck>cutoff,"yes","no"),levels=c("no","yes"))
+conf.bs.bck <- table(class.bs.bck,logit.bs.Test$y)
+print("Confusion matrix for Backward")
+conf.bs.bck
+
+bck.bs.logit.acc <- sum(diag(conf.bs.bck))/sum(conf.bs.bck)
+bck.bs.logit.sens <- (7705)/(7705+513)
+bck.bs.logit.spec <- (879)/(879+3259)
+
+# SLR Table
+slr.bs.acc <- rbind(step.bs.logit.acc, fwd.bs.logit.acc, bck.bs.logit.acc)
+slr.bs.aics <- rbind(step.bs.aic, fwd.bs.aic, bck.bs.aic)
+slr.bs.sens <- rbind(step.bs.logit.sens, fwd.bs.logit.sens, bck.bs.logit.sens)
+slr.bs.spec <- rbind(step.bs.logit.spec, fwd.bs.logit.spec, bck.bs.logit.spec)
+slr.bs.results <- cbind(slr.bs.acc, slr.bs.aics, slr.bs.sens, slr.bs.spec)
+colnames(slr.bs.results) <- c("Accuracy", "AIC", "Sensitivity", "Specificity")
+rownames(slr.bs.results) <- c("Stepwise", "Forward", "Backward")
+slr.bs.results
+```
+## Logit with rose data 69.90%
+```{r}
+set.seed(123)
+
+logit.rs.data <- obj1.data
+logit.rs.data$y <- as.factor(logit.rs.data$y)
+
+# Test & train
+trainIndex <- createDataPartition(logit.rs.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+
+logit.rs.Train <- ROSE(y ~ .,data = logit.rs.data[ trainIndex,])$data
+logit.rs.Test  <- logit.rs.data[-trainIndex,]
+
+# Build Full Model
+full.rs.log <- glm( y ~ .,family = binomial(link="logit"),data=logit.rs.Train)
+
+# Forward Model
+fwd.rs.log <- step(full.rs.log,
+     direction="forward",
+     data=logit.rs.Train)
+
+# Backward Model
+bck.rs.log <- step(full.rs.log,
+     direction="backward",
+     data=logit.rs.Train)
+
+# Stepwise Model
+step.rs.log <- step(full.rs.log,
+     direction="both",
+     data=logit.rs.Train)
+
+# Model Fit
+hoslem.test(step.rs.log$y, fitted(step.rs.log), g=14)
+hoslem.test(fwd.rs.log$y, fitted(fwd.rs.log), g=14)
+hoslem.test(bck.rs.log$y, fitted(bck.rs.log), g=14)
+
+# Model Plots
+#plot(fwd.rs.log)
+
+# Model Summary
+summary(step.rs.log)
+summary(fwd.rs.log)
+summary(bck.rs.log)
+
+# Error Metrics
+step.rs.aic <- step.rs.log$aic
+fwd.rs.aic <- fwd.rs.log$aic
+bck.rs.aic <- bck.rs.log$aic
+
+# Confidence Intervals
+step.rs.ci <- exp(cbind("Odds ratio" = coef(step.rs.log), confint.default(step.rs.log, level = 0.95)))
+fwd.rs.ci <- exp(cbind("Odds ratio" = coef(fwd.rs.log), confint.default(fwd.rs.log, level = 0.95)))
+bck.rs.ci <- exp(cbind("Odds ratio" = coef(bck.rs.log), confint.default(bck.rs.log, level = 0.95)))
+
+# VIF Scores
+step.rs.vif <- vif(step.rs.log)
+fwd.rs.vif <- vif(fwd.rs.log)
+bck.rs.vif <- vif(bck.rs.log)
+
+# Predictions & Accuracy - Stepwise
+cutoff <- 0.5
+fit.pred.rs.step <- predict(step.rs.log,newdata=logit.rs.Test,type="response")
+class.rs.step <- factor(ifelse(fit.pred.rs.step>cutoff,"yes","no"),levels=c("no","yes"))
+conf.rs.step <- table(class.rs.step,logit.rs.Test$y)
+print("Confusion matrix for Stepwise")
+conf.rs.step
+
+step.rs.logit.acc <- sum(diag(conf.rs.step))/sum(conf.rs.step)
+step.rs.logit.sens <- (7806)/(7806+560)
+step.rs.logit.spec <- (832)/(832+3158)
+
+# Predictions & Accuracy - Forward
+cutoff <- 0.5
+fit.pred.rs.fwd <- predict(fwd.rs.log,newdata=logit.rs.Test,type="response")
+class.rs.fwd <- factor(ifelse(fit.pred.rs.fwd>cutoff,"yes","no"),levels=c("no","yes"))
+conf.rs.fwd <- table(class.rs.fwd,logit.rs.Test$y)
+print("Confusion matrix for Forward")
+conf.rs.fwd
+
+fwd.rs.logit.acc <- sum(diag(conf.rs.fwd))/sum(conf.rs.fwd)
+fwd.rs.logit.sens <- (7806)/(7806+560)
+fwd.rs.logit.spec <- (832)/(832+3158)
+
+# Predictions & Accuracy - Backward
+cutoff <- 0.5
+fit.pred.rs.bck <- predict(bck.rs.log,newdata=logit.rs.Test,type="response")
+class.rs.bck <- factor(ifelse(fit.pred.rs.bck>cutoff,"yes","no"),levels=c("no","yes"))
+conf.rs.bck <- table(class.rs.bck,logit.rs.Test$y)
+print("Confusion matrix for Backward")
+conf.rs.bck
+
+bck.rs.logit.acc <- sum(diag(conf.rs.bck))/sum(conf.rs.bck)
+bck.rs.logit.sens <- (7806)/(7806+560)
+bck.rs.logit.spec <- (832)/(832+3158)
+
+# SLR Table
+slr.rs.acc <- rbind(step.rs.logit.acc, fwd.rs.logit.acc, bck.rs.logit.acc)
+slr.rs.aics <- rbind(step.rs.aic, fwd.rs.aic, bck.rs.aic)
+slr.rs.sens <- rbind(step.rs.logit.sens, fwd.rs.logit.sens, bck.rs.logit.sens)
+slr.rs.spec <- rbind(step.rs.logit.spec, fwd.rs.logit.spec, bck.rs.logit.spec)
+slr.rs.results <- cbind(slr.rs.acc, slr.rs.aics, slr.rs.sens, slr.rs.spec)
+colnames(slr.rs.results) <- c("Accuracy", "AIC", "Sensitivity", "Specificity")
+rownames(slr.rs.results) <- c("Stepwise", "Forward", "Backward")
+slr.rs.results
+```
+
+## Objective 1 results table
+```{r}
+obj1.results <- rbind(slr.os.results, slr.bs.results, slr.rs.results)
+rownames(obj1.results) <- c("Stepwise Orig", "Forward Orig", "Backward Orig",
+                           "Stepwise Bal", "Forward Bal", "Backward Bal",
+                           "Stepwise Rose", "Forward Rose", "Backward Rose")
+obj1.results
+```
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+# Objective 2
+## Final Datasets to be used in objective 2
+```{r}
+set.seed(123)
+
+# Select transformations
+EDAD2 <- EDAD
+EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
+EDAD2$age <- log(EDAD2$age)
+
+
+# EDA dataset - narrowed down to columns to be used in regression
+edadata <- EDAD2
+edadata <- edadata %>%
+  select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
+         poutcome, cons.price.idx, cons.conf.idx, y)
+
+obj2.data <- edadata
+```
+
+# --------------------------------------------------------
+
+## Simple with original 87.85%
+```{r}
+set.seed(123)
+
+simple.o.lr <- obj2.data
+simple.o.lr$y <- as.numeric(as.factor(simple.o.lr$y))
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.o.lr), 0.7*nrow(simple.o.lr))  # row indices for training data
+simple.o.train <- simple.o.lr[simple.index, ]  # model training data
+simple.o.test  <- simple.o.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.o.lm <- lm(y ~ ., data=simple.o.train)  # build the model
+simple.o.pred <- as.numeric(round(predict(simple.o.lm, simple.o.test)))  # predict y
+
+# AIC & BIC
+simple.o.aic <- AIC(simple.o.lm)
+simple.o.bic <- BIC(simple.o.lm)
+simple.o.aic
+simple.o.bic
+
+# Summary
+summary(simple.o.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.o.test$y, predicteds=simple.o.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.o.acc <- min_max_accuracy
+simple.o.acc
+mape
+
+# Error
+simple.o.error <- mean(simple.o.test$y != simple.o.pred)
+simple.o.error
+
+# Confusion Matrix
+simple.o.cm <- confusionMatrix(simple.o.pred, simple.o.test$y)
+simple.o.cm
+
+# Sensitivity and Specificity
+simple.o.sens <- (251)/(251+147)
+simple.o.sens
+simple.o.spec <- (10858)/(10858+1101)
+simple.o.spec
+
+vif(simple.o.lm)
+```
+## Simple with balanced data 84.09%
+```{r}
+set.seed(123)
+
+simple.b.lr <- obj2.data
+simple.b.lr$y <- as.numeric(as.factor(simple.b.lr$y))
+
+# Train Index
+trainIndex <- createDataPartition(simple.b.lr$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+simple.b.train <- balanced_split_data
+simple.b.test  <- simple.b.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.b.lm <- lm(y ~ ., data=simple.b.train)  # build the model
+simple.b.pred <- predict(simple.b.lm, simple.b.test)  # predict y
+simple.b.pred <- round(simple.b.pred)
+
+# AIC & BIC
+simple.b.aic <- AIC(simple.b.lm)
+simple.b.bic <- BIC(simple.b.lm)
+
+# Summary
+summary(simple.b.lm)
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.b.test$y, predicteds=simple.b.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.b.acc <- min_max_accuracy
+simple.b.acc
+mape
+
+# Error
+simple.b.error <- mean(simple.b.test$y != simple.b.pred)
+simple.b.error
+
+# Confusion Matrix
+table(simple.b.test$y, simple.b.pred)
+
+# Sensitivity and Specificity
+simple.b.sens <- (7589)/(7589+3416)
+simple.b.sens
+simple.b.spec <- (837)/(837+515)
+simple.b.spec
+
+vif(simple.b.lm)
+```
+## Simple with rose data 83.28
+```{r}
+set.seed(123)
+
+simple.r.lr <- obj2.data
+simple.r.lr$y <- as.numeric(as.factor(simple.r.lr$y))
+
+# Create Training and Test data -
+simple.index <- sample(1:nrow(simple.r.lr), 0.7*nrow(simple.r.lr))  # row indices for training data
+simple.r.train <- ROSE(y ~ .,data = simple.r.lr[simple.index, ])$data
+simple.r.test  <- simple.r.lr[-simple.index, ]   # test data
+
+# Build the model on training data -
+simple.r.lm <- lm(y ~ ., data=simple.r.train)  # build the model
+simple.r.pred <- predict(simple.r.lm, simple.r.test)  # predict y
+simple.r.pred <- round(simple.r.pred)
+
+# AIC & BIC
+simple.r.aic <- AIC(simple.r.lm)
+simplr.r.bic <- BIC(simple.r.lm)
+simple.r.aic
+
+# Summary
+summary(simple.r.lm)
+
+# Error
+simple.r.error <- mean(simple.r.test$y != simple.r.pred)
+simple.r.error
+
+# Prediction accuracy and eror rates
+actuals_preds <- data.frame(cbind(actuals=simple.r.test$y, predicteds=simple.r.pred))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+simple.r.acc <- min_max_accuracy
+simple.r.acc
+mape
+
+# Confusion Matrix
+table(simple.r.test$y, simple.r.pred)
+
+# Sensitivity and Specificity
+simple.r.sens <- (7380)/(7380+3625)
+simple.r.sens
+simple.r.spec <- (845)/(845+507)
+simple.r.spec
+
+vif(simple.r.lm)
+```
+
+# --------------------------------------------------------
+
+## Logit with original data 89.69% (NEED INTERACTION TERMS AND COMPLEXITY)
+```{r}
+set.seed(123)
+
+logit.os.data <- obj2.data
 logit.os.data$y <- as.factor(logit.os.data$y)
 
 # Test & train
@@ -263,19 +787,24 @@ vif(step.os.log)
 # Predictions & Accuracy
 fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 conf.step<-table(class.step,logit.os.Test$y)
 print("Confusion matrix for Stepwise")
 conf.step
 step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.os.logit.acc
-```
+step.os.logit.sens <- (10856)/(10856+1163)
+step.os.logit.sens
+step.os.logit.spec <- (229)/(229+108)
+step.os.logit.spec
 
-## Logit with balanced data 64.29%
+
+```
+## Logit with balanced ata 71.49 (NEED INTERACTION TERMS AND COMPLEXITY)
 ```{r}
 set.seed(123)
 
-logit.bs.data <- bdata
+logit.bs.data <- obj2.data
 logit.bs.data$y <- as.factor(logit.bs.data$y)
 
 # Test & train
@@ -283,7 +812,7 @@ trainIndex <- createDataPartition(logit.bs.data$y, p = .7,
                                   list = FALSE,
                                   times = 1)
 
-logit.bs.Train <- logit.bs.data[ trainIndex,]
+logit.bs.Train <- ovun.sample(y ~ .,data = logit.bs.data[ trainIndex,], method = "under")$data
 logit.bs.Test  <- logit.bs.data[-trainIndex,]
 
 # Build Full Model
@@ -308,19 +837,22 @@ vif(step.bs.log)
 # Predictions & Accuracy
 fit.pred.step<-predict(step.bs.log,newdata=logit.bs.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 conf.step<-table(class.step,logit.bs.Test$y)
 print("Confusion matrix for Stepwise")
 conf.step
 step.bs.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.bs.logit.acc
+step.bs.logit.sens <- (7698)/(7698+552)
+step.bs.logit.sens
+step.bs.logit.spec <- (840)/(840+2996)
+step.bs.logit.spec
 ```
-
-## Logit with rose data 64.37%
+## Logit with rose data 69.90% (NEED INTERACTION TERMS AND COMPLEXITY)
 ```{r}
 set.seed(123)
 
-logit.rs.data <- rdata
+logit.rs.data <- obj2.data
 logit.rs.data$y <- as.factor(logit.rs.data$y)
 
 # Test & train
@@ -328,7 +860,7 @@ trainIndex <- createDataPartition(logit.rs.data$y, p = .7,
                                   list = FALSE,
                                   times = 1)
 
-logit.rs.Train <- logit.rs.data[ trainIndex,]
+logit.rs.Train <- ROSE(y ~ .,data = logit.rs.data[ trainIndex,])$data
 logit.rs.Test  <- logit.rs.data[-trainIndex,]
 
 # Build Full Model
@@ -353,300 +885,26 @@ vif(step.rs.log)
 # Predictions & Accuracy
 fit.pred.step<-predict(step.rs.log,newdata=logit.rs.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 conf.step<-table(class.step,logit.rs.Test$y)
 print("Confusion matrix for Stepwise")
 conf.step
 step.rs.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.rs.logit.acc
+step.rs.logit.sens <- (7706)/(7706+554)
+step.rs.logit.sens
+step.rs.logit.spec <- (838)/(838+3258)
+step.rs.logit.spec
 ```
 
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------
 
-# Objective 2
-## Final Datasets to be used in objective 2
-```{r}
-set.seed(123)
-
-# Select transformations
-EDAD2 <- EDAD
-EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
-EDAD2$age <- log(EDAD2$age)
-
-
-# EDA dataset - narrowed down to columns to be used in regression
-edadata <- EDAD2
-edadata <- edadata %>%
-  select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
-         poutcome, cons.price.idx, cons.conf.idx, y)
-
-# Original unbalanced dataset
-odata <- edadata 
-
-# Balanced dataset using under weighting
-bdata <-ovun.sample(y ~ .,data = edadata, method = "under", N = 9280)$data
-prop.table(table(bdata$y))
-
-# Balanced using ROSE package
-rdata <- ROSE(y ~ ., data = edadata)$data
-prop.table(table(rdata$y))
-```
-
-# ------------------------------------
-
-## Simple with original 87.85%
-```{r}
-set.seed(123)
-
-simple.o.lr <- odata
-simple.o.lr$y <- as.numeric(as.factor(simple.o.lr$y))
-
-# Create Training and Test data -
-simple.index <- sample(1:nrow(simple.o.lr), 0.7*nrow(simple.o.lr))  # row indices for training data
-simple.o.train <- simple.o.lr[simple.index, ]  # model training data
-simple.o.test  <- simple.o.lr[-simple.index, ]   # test data
-
-# Build the model on training data -
-simple.o.lm <- lm(y ~ ., data=simple.o.train)  # build the model
-simple.o.pred <- predict(simple.o.lm, simple.o.test)  # predict y
-
-# AIC & BIC
-simple.o.aic <- AIC(simple.o.lm)
-simple.o.bic <- BIC(simple.o.lm)
-simple.o.aic
-simple.o.bic
-
-# Summary
-summary(simple.o.lm)
-
-# Prediction accuracy and eror rates
-actuals_preds <- data.frame(cbind(actuals=simple.o.test$y, predicteds=simple.o.pred))
-min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
-mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.o.acc <- min_max_accuracy
-simple.o.acc
-mape
-
-vif(simple.o.lm)
-```
-
-## Simple with balanced data 74.61%
-```{r}
-set.seed(123)
-
-simple.b.lr <- bdata
-simple.b.lr$y <- as.numeric(as.factor(simple.b.lr$y))
-
-# Create Training and Test data -
-simple.index <- sample(1:nrow(simple.b.lr), 0.7*nrow(simple.b.lr))  # row indices for training data
-simple.b.train <- simple.b.lr[simple.index, ]  # model training data
-simple.b.test  <- simple.b.lr[-simple.index, ]   # test data
-
-# Build the model on training data -
-simple.b.lm <- lm(y ~ ., data=simple.b.train)  # build the model
-simple.b.pred <- predict(simple.b.lm, simple.b.test)  # predict y
-
-# AIC & BIC
-simple.b.aic <- AIC(simple.b.lm)
-simple.b.bic <- BIC(simple.b.lm)
-simple.b.aic
-
-# Summary
-summary(simple.b.lm)
-
-# Prediction accuracy and eror rates
-actuals_preds <- data.frame(cbind(actuals=simple.b.test$y, predicteds=simple.b.pred))
-min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
-mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.b.acc <- min_max_accuracy
-simple.b.acc
-mape
-
-vif(simple.b.lm)
-```
-
-## Simple with rose data 74.19%
-```{r}
-set.seed(123)
-
-simple.r.lr <- rdata
-simple.r.lr$y <- as.numeric(as.factor(simple.r.lr$y))
-
-# Create Training and Test data -
-simple.index <- sample(1:nrow(simple.r.lr), 0.7*nrow(simple.r.lr))  # row indices for training data
-simple.r.train <- simple.r.lr[simple.index, ]  # model training data
-simple.r.test  <- simple.r.lr[-simple.index, ]   # test data
-
-# Build the model on training data -
-simple.r.lm <- lm(y ~ ., data=simple.r.train)  # build the model
-simple.r.pred <- predict(simple.r.lm, simple.r.test)  # predict y
-
-# AIC & BIC
-simple.r.aic <- AIC(simple.r.lm)
-simplr.r.bic <- BIC(simple.r.lm)
-simple.r.aic
-
-# Summary
-summary(simple.r.lm)
-
-# Prediction accuracy and eror rates
-actuals_preds <- data.frame(cbind(actuals=simple.r.test$y, predicteds=simple.r.pred))
-min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
-mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.r.acc <- min_max_accuracy
-simple.r.acc
-mape
-
-vif(simple.r.lm)
-```
-
-# -------------------------------------
-
-## Logit with original data 89.69% (NEED INTERACTION TERMS OR NEW VARS)
-```{r}
-set.seed(123)
-
-logit.o.data <- odata
-logit.o.data$y <- as.factor(logit.o.data$y)
-
-# Test & train
-trainIndex <- createDataPartition(logit.o.data$y, p = .7,
-                                  list = FALSE,
-                                  times = 1)
-
-logit.o.Train <- logit.o.data[ trainIndex,]
-logit.o.Test  <- logit.o.data[-trainIndex,]
-
-# Build Full Model
-full.o.log<-glm(y ~ age + job + marital + education + contact + month + day_of_week + campaign + pdays + previous +
-         poutcome + cons.price.idx + cons.conf.idx, family="binomial",data=logit.o.Train)
-
-# Step Model
-step.o.log<-full.o.log %>% stepAIC(trace=FALSE)
-
-# Model Summary
-summary(step.o.log)
-
-# Error Metrics
-step.o.aic <- step.o.log$aic
-step.o.aic
-
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.o.log), confint.default(step.o.log, level = 0.95)))
-
-# VIF Scores
-vif(step.o.log)
-
-# Predictions & Accuracy
-fit.pred.step<-predict(step.o.log,newdata=logit.o.Test,type="response")
-cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
-conf.step<-table(class.step,logit.o.Test$y)
-print("Confusion matrix for Stepwise")
-conf.step
-step.o.logit.acc <- sum(diag(conf.step))/sum(conf.step)
-step.o.logit.acc
-```
-
-## Logit with balanced data 69.99% (NEED INTERACTION TERMS OR NEW VARS)
-```{r}
-set.seed(123)
-
-logit.b.data <- bdata
-logit.b.data$y <- as.factor(logit.b.data$y)
-
-# Test & train
-trainIndex <- createDataPartition(logit.b.data$y, p = .7,
-                                  list = FALSE,
-                                  times = 1)
-
-logit.b.Train <- logit.b.data[ trainIndex,]
-logit.b.Test  <- logit.b.data[-trainIndex,]
-
-# Build Full Model
-full.b.log<-glm(y~.,family="binomial",data=logit.b.Train)
-
-# Step Model
-step.b.log<-full.b.log %>% stepAIC(trace=FALSE)
-
-# Model Summary
-summary(step.b.log)
-
-# Error Metrics
-step.b.aic <- step.b.log$aic
-step.b.aic
-
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.b.log), confint.default(step.b.log, level = 0.95)))
-
-# VIF Scores
-vif(step.b.log)
-
-# Predictions & Accuracy
-fit.pred.step<-predict(step.b.log,newdata=logit.o.Test,type="response")
-cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
-conf.step<-table(class.step,logit.o.Test$y)
-print("Confusion matrix for Stepwise")
-conf.step
-step.b.logit.acc <- sum(diag(conf.step))/sum(conf.step)
-step.b.logit.acc
-```
-
-## Logit with rose data 68.46% (NEED INTERACTION TERMS OR NEW VARS)
-```{r}
-set.seed(123)
-
-logit.r.data <- rdata
-logit.r.data$y <- as.factor(logit.r.data$y)
-
-# Test & train
-trainIndex <- createDataPartition(logit.r.data$y, p = .7,
-                                  list = FALSE,
-                                  times = 1)
-
-logit.r.Train <- logit.r.data[ trainIndex,]
-logit.r.Test  <- logit.r.data[-trainIndex,]
-
-# Build Full Model
-full.r.log<-glm(y~.,family="binomial",data=logit.r.Train)
-
-# Step Model
-step.r.log<-full.r.log %>% stepAIC(trace=FALSE)
-
-# Model Summary
-summary(step.r.log)
-
-# Error Metrics
-step.r.aic <- step.r.log$aic
-step.r.aic
-
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.r.log), confint.default(step.r.log, level = 0.95)))
-
-# VIF Scores
-vif(step.r.log)
-
-# Predictions & Accuracy
-fit.pred.step<-predict(step.r.log,newdata=logit.o.Test,type="response")
-cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"no","yes"),levels=c("yes","no"))
-conf.step<-table(class.step,logit.o.Test$y)
-print("Confusion matrix for Stepwise")
-conf.step
-step.r.logit.acc <- sum(diag(conf.step))/sum(conf.step)
-step.r.logit.acc
-```
-
-# ------------------
-
-## LDA with original data 89.83%
+## LDA with original data 89.69%
 ```{r}
 set.seed(123)
 
 # Split the data into training (70%) and test set (30%)
-lda.o.data <- odata
+lda.o.data <- obj2.data
 training.samples <- lda.o.data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
 LDA.o.train.data <- lda.o.data[training.samples, ]
@@ -663,32 +921,60 @@ LDA.o.test.transformed <- o.preproc.param %>% predict(LDA.o.test.data)
 lda.o.model <- lda(y ~ ., data = LDA.o.train.transformed)
 lda.o.model
 
-# Plot results
-plot(lda.o.model)
-
 # Make predictions
 lda.o.predictions <- lda.o.model %>% predict(LDA.o.test.transformed)
 
-# Accuracy
-lda.o.acc <- mean(lda.o.predictions$class==LDA.o.test.transformed$y)
-lda.o.acc
-```
+# Error
+lda.o.error <- mean(LDA.o.test.data$y != lda.o.predictions$class)
+lda.o.error
 
-## LDA with balanced data 64.11%
+# Confusion Matrix
+lda.o.cm <- confusionMatrix(lda.o.predictions$class, as.factor(LDA.o.test.data$y))
+lda.o.cm
+
+# Accuracy
+lda.o.acc <- 0.897
+lda.o.acc
+
+# Sensitivity and Specificity
+lda.o.sens <- 0.9857
+lda.o.sens
+lda.o.spec <- 0.1983
+lda.o.spec
+```
+## LDA with balanced data 67.16%
 ```{r}
 set.seed(123)
 
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
-lda.b.data <- bdata
-training.samples <- lda.b.data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-LDA.b.train.data <- lda.b.data[training.samples, ]
+lda.b.data <- obj2.data
+
+# Train Index
+trainIndex <- createDataPartition(lda.b.data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.factor(balanced_split_data$y)
+
+# Generate train/test datasets
+LDA.b.train.data <- balanced_split_data
 LDA.b.test.data <- lda.b.data[-training.samples, ]
 
 # Estimate preprocessing parameters
 b.preproc.param <- LDA.b.train.data %>% 
   preProcess(method = c("center", "scale"))
+
 # Transform the data using the estimated parameters
 LDA.b.train.transformed <- b.preproc.param %>% predict(LDA.b.train.data)
 LDA.b.test.transformed <- b.preproc.param %>% predict(LDA.b.test.data)
@@ -697,27 +983,37 @@ LDA.b.test.transformed <- b.preproc.param %>% predict(LDA.b.test.data)
 lda.b.model <- lda(y ~ ., data = LDA.b.train.transformed)
 lda.b.model
 
-# Plot results
-plot(lda.b.model)
-
 # Make predictions
 lda.b.predictions <- lda.b.model %>% predict(LDA.b.test.transformed)
 
-# Accuracy
-lda.b.acc <- mean(lda.b.predictions$class==LDA.b.test.transformed$y)
-lda.b.acc
-```
+# Error
+lda.b.error <- mean(LDA.b.test.data$y != lda.b.predictions$class)
+lda.b.error
 
-## LDA with rose data 64.49%
+# Confusion Matrix
+lda.b.cm <- confusionMatrix(lda.b.predictions$class, as.factor(LDA.b.test.data$y))
+lda.b.cm
+
+# Accuracy
+lda.b.acc <- 0.6843
+lda.b.acc
+
+# Sensitivity and Specificity
+lda.b.sens <- 0.6904
+lda.b.sens
+lda.b.spec <- 0.6365
+lda.b.spec
+```
+## LDA with rose data 69.25%
 ```{r}
 set.seed(123)
 
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
-lda.r.data <- rdata
+lda.r.data <- obj2.data
 training.samples <- lda.r.data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-LDA.r.train.data <- lda.r.data[training.samples, ]
+LDA.r.train.data <- ROSE(y ~ .,data = lda.r.data[training.samples, ])$data
 LDA.r.test.data <- lda.r.data[-training.samples, ]
 
 # Estimate preprocessing parameters
@@ -731,24 +1027,35 @@ LDA.r.test.transformed <- r.preproc.param %>% predict(LDA.r.test.data)
 lda.r.model <- lda(y ~ ., data = LDA.r.train.transformed)
 lda.r.model
 
-# Plot results
-plot(lda.r.model)
-
 # Make predictions
 lda.r.predictions <- lda.r.model %>% predict(LDA.r.test.transformed)
 
+# Error
+lda.r.error <- mean(LDA.r.test.data$y != lda.r.predictions$class)
+lda.r.error
+
+# Confusion Matrix
+lda.r.cm <- confusionMatrix(lda.r.predictions$class, as.factor(LDA.r.test.data$y))
+lda.r.cm
+
 # Accuracy
-lda.r.acc <- mean(lda.r.predictions$class==LDA.r.test.transformed$y)
+lda.r.acc <- 0.6925
 lda.r.acc
+
+# Sensitivity and Specificity
+lda.r.sens <- 0.7045
+lda.r.sens
+lda.r.spec <- 0.5984
+lda.r.spec
 ```
 
-# ------------------
+# --------------------------------------------------------
 
 ## QDA with original data 88.17%
 ```{r}
 set.seed(123)
 
-QDA.o.Data <- odata
+QDA.o.Data <- obj2.data
 
 QDA.o.Data$y <- as.numeric(as.factor(QDA.o.Data$y))
 
@@ -764,23 +1071,51 @@ qda.o.model
 # Make predictions
 qda.o.predictions <- qda.o.model %>% predict(QDA.o.test.data)
 
-# Model accuracy
-qda.o.acc <- mean(qda.o.predictions$class == QDA.o.test.data$y)
-qda.o.acc
-```
+# Error
+qda.o.error <- mean(QDA.o.test.data$y != qda.o.predictions$class)
+qda.o.error
 
-## QDA with balanced data 65.12%
+# Confusion Matrix
+qda.o.cm <- confusionMatrix(qda.o.predictions$class, as.factor(QDA.o.test.data$y))
+qda.o.cm
+
+# Model accuracy
+qda.o.acc <- 0.8818
+qda.o.acc
+
+# Sensitivity and Specificity
+qda.o.sens <- 0.9525
+qda.o.sens
+qda.o.spec <- 0.3062
+qda.o.spec
+```
+## QDA with balanced data 87.39%
 ```{r}
 set.seed(123)
 
-QDA.b.Data <- bdata
+QDA.b.Data <- obj2.data
 
 QDA.b.Data$y <- as.numeric(as.factor(QDA.b.Data$y))
 
-training.samples <- QDA.b.Data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
+# Train Index
+trainIndex <- createDataPartition(QDA.b.Data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
 
-QDA.b.train.data <- QDA.b.Data[training.samples, ]
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+QDA.b.train.data <- balanced_split_data
 QDA.b.test.data <- QDA.b.Data[-training.samples, ]
 
 # Fit the model
@@ -790,23 +1125,35 @@ qda.b.model
 # Make predictions
 qda.b.predictions <- qda.b.model %>% predict(QDA.b.test.data)
 
-# Model accuracy
-qda.b.acc <- mean(qda.b.predictions$class == QDA.b.test.data$y)
-qda.b.acc
-```
+# Error
+qda.b.error <- mean(QDA.b.test.data$y != qda.b.predictions$class)
+qda.b.error
 
-## QDA with rose data 80.67%
+# Confusion Matrix
+qda.b.cm <- confusionMatrix(qda.b.predictions$class, as.factor(QDA.b.test.data$y))
+qda.b.cm
+
+# Model accuracy
+qda.o.acc <- 0.875
+qda.o.acc
+
+# Sensitivity and Specificity
+qda.b.sens <- 0.9339
+qda.b.sens
+qda.b.spec <- 0.3950
+qda.b.spec
+```
+## QDA with rose data 87.93%
 ```{r}
 set.seed(123)
 
-QDA.r.Data <- rdata
+QDA.r.Data <- obj2.data
 
 QDA.r.Data$y <- as.numeric(as.factor(QDA.r.Data$y))
 
 training.samples <- QDA.r.Data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-
-QDA.r.train.data <- QDA.r.Data[training.samples, ]
+QDA.r.train.data <- ROSE(y ~ .,data = QDA.r.Data[training.samples, ])$data
 QDA.r.test.data <- QDA.r.Data[-training.samples, ]
 
 # Fit the model
@@ -816,379 +1163,32 @@ qda.r.model
 # Make predictions
 qda.r.predictions <- qda.r.model %>% predict(QDA.r.test.data)
 
+# Error
+qda.r.error <- mean(QDA.r.test.data$y != qda.r.predictions$class)
+qda.r.error
+
+# Confusion Matrix
+qda.r.cm <- confusionMatrix(qda.r.predictions$class, as.factor(QDA.r.test.data$y))
+qda.r.cm
+
 # Model accuracy
-qda.r.acc <- mean(qda.r.predictions$class == QDA.r.test.data$y)
-qda.r.acc
+qda.o.acc <- 0.8793
+qda.o.acc
+
+# Sensitivity and Specificity
+qda.r.sens <- 0.9443
+qda.r.sens
+qda.r.spec <- 0.3506
+qda.r.spec
 ```
 
-# -----------------------------------------------------------------------------
-
-## Ridge with original data 87.85%
-```{r}
-set.seed(123)
-
-ridge.o.lr <- odata
-
-ridge.o.lr$y <- as.numeric(as.factor(ridge.o.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.o.lr), 0.7*nrow(ridge.o.lr)) # indices for 70% training data
-ridge.o.train <- ridge.o.lr[ridge.Index, ] # training data
-ridge.o.test <- ridge.o.lr[-ridge.Index, ] # test data
-
-ridge.o.model <- linearRidge(y ~ ., data = ridge.o.train)
-
-summary(ridge.o.model)
-
-ridge.o.pred <- predict(ridge.o.model, ridge.o.test)  # predict on test data
-ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
-
-ridge.o.acc <- mean(apply(ridge.o.compare, 1, min)/apply(ridge.o.compare, 1, max)) 
-ridge.o.acc
-
-```
-
-## Ridge with balanced data 74.58%
-```{r}
-set.seed(123)
-
-ridge.b.lr <- bdata
-
-ridge.b.lr$y <- as.numeric(as.factor(ridge.b.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.b.lr), 0.7*nrow(ridge.b.lr)) # indices for 70% training data
-ridge.b.train <- ridge.b.lr[ridge.Index, ] # training data
-ridge.b.test <- ridge.b.lr[-ridge.Index, ] # test data
-
-ridge.b.model <- linearRidge(y ~ ., data = ridge.b.train)
-summary(ridge.b.model)
-
-ridge.b.pred <- predict(ridge.b.model, ridge.b.test)  # predict on test data
-ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
-
-ridge.b.acc <- mean(apply(ridge.b.compare, 1, min)/apply(ridge.b.compare, 1, max))
-ridge.b.acc
-```
-
-## Ridge with rose data 74.18%
-```{r}
-set.seed(123)
-
-ridge.r.lr <- rdata
-
-ridge.r.lr$y <- as.numeric(as.factor(ridge.r.lr$y))
-
-ridge.Index <- sample(1:nrow(ridge.r.lr), 0.7*nrow(ridge.r.lr)) # indices for 70% training data
-ridge.r.train <- ridge.r.lr[ridge.Index, ] # training data
-ridge.r.test <- ridge.r.lr[-ridge.Index, ] # test data
-
-ridge.r.model <- linearRidge(y ~ ., data = ridge.r.train)
-
-summary(ridge.r.model)
-
-ridge.r.pred <- predict(ridge.r.model, ridge.r.test)  # predict on test data
-ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
-
-ridge.r.acc <- mean(apply(ridge.r.compare, 1, min)/apply(ridge.r.compare, 1, max)) 
-ridge.r.acc
-```
-
-# -------------------------------------------------------------------------------
-
-## LASSO Regression original data 88.73%
-```{r}
-set.seed(123)
-
-lasso.o.lr <- odata
-lasso.o.lr$y <- as.factor(lasso.o.lr$y)
-
-training.samples <- lasso.o.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-lasso.o.train.data <- lasso.o.lr[training.samples, ]
-lasso.o.test.data <- lasso.o.lr[-training.samples, ]
-
-dat.o.train.x <- model.matrix(y~.,lasso.o.train.data)
-dat.o.train.y <- lasso.o.train.data[,14]
-
-cvfit <- cv.glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate is little below .1
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit lasso using entire
-lasso.o.model<-glmnet(dat.o.train.x, dat.o.train.y, family = "binomial",lambda=cvfit$lambda.min)
-
-dat.o.test.x<-model.matrix(y~.,lasso.o.test.data)
-fit.o.pred.lasso <- predict(lasso.o.model, newx = dat.o.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.o.lasso<-table(class.o.lasso,lasso.o.test.data$y)
-print("Confusion matrix for LASSO")
-conf.o.lasso
-
-#Accuracy 
-lasso.o.acc <- sum(diag(conf.o.lasso))/sum(conf.o.lasso)
-lasso.o.acc 
-```
-
-## LASSO Regression balanced data 60.04%
-```{r}
-set.seed(123)
-
-lasso.b.lr <- bdata
-lasso.b.lr$y <- as.factor(lasso.b.lr$y)
-
-training.samples <- lasso.b.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-lasso.b.train.data <- lasso.b.lr[training.samples, ]
-lasso.b.test.data <- lasso.b.lr[-training.samples, ]
-
-dat.b.train.x <- model.matrix(y~.,lasso.b.train.data)
-dat.b.train.y <- lasso.b.train.data[,14]
-
-cvfit <- cv.glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate is little below .1
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit lasso using entire
-lasso.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial",lambda=cvfit$lambda.min)
-
-dat.b.test.x<-model.matrix(y~.,lasso.b.test.data)
-fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.b.lasso<-table(class.b.lasso,lasso.b.test.data$y)
-print("Confusion matrix for LASSO")
-conf.b.lasso
-
-#Accuracy 
-lasso.b.acc <- sum(diag(conf.b.lasso))/sum(conf.b.lasso)
-lasso.b.acc 
-```
-
-## LASSO Regression Rose data 65.46%
-```{r}
-set.seed(123)
-
-lasso.r.lr <- rdata
-lasso.r.lr$y <- as.factor(lasso.r.lr$y)
-
-training.samples <- lasso.r.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-lasso.r.train.data <- lasso.r.lr[training.samples, ]
-lasso.r.test.data <- lasso.r.lr[-training.samples, ]
-
-dat.r.train.x <- model.matrix(y~.,lasso.r.train.data)
-dat.r.train.y <- lasso.r.train.data[,14]
-
-cvfit <- cv.glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate is little below .1
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit lasso using entire
-lasso.r.model<-glmnet(dat.r.train.x, dat.r.train.y, family = "binomial",lambda=cvfit$lambda.min)
-
-dat.r.test.x<-model.matrix(y~.,lasso.r.test.data)
-fit.r.pred.lasso <- predict(lasso.r.model, newx = dat.r.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.r.lasso<-table(class.r.lasso,lasso.r.test.data$y)
-print("Confusion matrix for LASSO")
-conf.r.lasso
-
-#Accuracy 
-lasso.r.acc <- sum(diag(conf.r.lasso))/sum(conf.r.lasso)
-lasso.r.acc 
-```
-
-# -------------------------------------------------------------------------------
-
-## Net Regression balanced data 66.63% (Giving weird accuracy metric... not sure)
-```{r}
-set.seed(123)
-
-net.o.lr <- odata
-net.o.lr$y <- as.factor(net.o.lr$y)
-
-training.samples <- net.o.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-net.o.train.data <- net.o.lr[training.samples, ]
-net.o.test.data <- net.o.lr[-training.samples, ]
-
-dat.o.train.x <- model.matrix(y~.,net.o.train.data)
-dat.o.train.y <- net.o.train.data[,14]
-
-cvfit <- cv.glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class",
-                   alpha = 0.5,  nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-
-#CV misclassification error rate
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit net using entire
-net.o.model<-glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
-
-dat.o.test.x<-model.matrix(y~.,net.o.test.data)
-fit.o.pred.net <- predict(net.o.model, newx = dat.o.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.o.net<-factor(ifelse(fit.o.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.o.net<-table(class.o.net,net.o.test.data$y)
-print("Confusion matrix for net")
-conf.o.net
-
-#Accuracy 
-net.o.acc <- sum(diag(conf.o.net))/sum(conf.o.net)
-net.o.acc 
-```
-
-## Net Regression balanced data 66.63%
-```{r}
-set.seed(123)
-
-net.b.lr <- bdata
-net.b.lr$y <- as.factor(net.b.lr$y)
-
-training.samples <- net.b.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-net.b.train.data <- net.b.lr[training.samples, ]
-net.b.test.data <- net.b.lr[-training.samples, ]
-
-dat.b.train.x <- model.matrix(y~.,net.b.train.data)
-dat.b.train.y <- net.b.train.data[,14]
-
-cvfit <- cv.glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", type.measure = "class",
-                   alpha = 0.5,  nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit net using entire
-net.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
-
-dat.b.test.x<-model.matrix(y~.,net.b.test.data)
-fit.b.pred.net <- predict(net.b.model, newx = dat.b.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.b.net<-factor(ifelse(fit.b.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.b.net<-table(class.b.net,net.b.test.data$y)
-print("Confusion matrix for net")
-conf.b.net
-
-#Accuracy 
-net.b.acc <- sum(diag(conf.b.net))/sum(conf.b.net)
-net.b.acc 
-```
-
-## Net Regression Rose data 65.89%
-```{r}
-set.seed(123)
-
-net.r.lr <- rdata
-net.r.lr$y <- as.factor(net.r.lr$y)
-
-training.samples <- net.r.lr$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-net.r.train.data <- net.r.lr[training.samples, ]
-net.r.test.data <- net.r.lr[-training.samples, ]
-
-dat.r.train.x <- model.matrix(y~.,net.r.train.data)
-dat.r.train.y <- net.r.train.data[,14]
-
-cvfit <- cv.glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", type.measure = "class",
-                   alpha = 0.5,  nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-
-#Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-
-#For final model predictions go ahead and refit net using entire
-net.r.model<-glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", alpha = 0.5, lambda=cvfit$lambda.min)
-
-dat.r.test.x<-model.matrix(y~.,net.r.test.data)
-fit.r.pred.net <- predict(net.r.model, newx = dat.r.test.x, type = "response")
-
-#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
-#Lets use a cutoff of 0.5 to make the classification.
-cutoff<-0.5
-class.r.net<-factor(ifelse(fit.r.pred.net>cutoff,"no","yes"),levels=c("yes","no"))
-
-#Confusion Matrix 
-conf.r.net<-table(class.r.net,net.r.test.data$y)
-print("Confusion matrix for net")
-conf.r.net
-
-#Accuracy 
-net.r.acc <- sum(diag(conf.r.net))/sum(conf.r.net)
-net.r.acc 
-```
-
-# -------------------------------------------------------------------------------
+# --------------------------------------------------------
 
 ## MDA with original data 88.69%
 ```{r}
 set.seed(123)
 
-MDA.o.Data <- odata
+MDA.o.Data <- obj2.data
 MDA.o.Data$y <- as.numeric(as.factor(MDA.o.Data$y))
 
 training.samples <- MDA.o.Data$y %>%
@@ -1200,66 +1200,126 @@ MDA.o.test.data <- MDA.o.Data[-training.samples, ]
 # Fit the model
 mda.o.model <- mda(y ~ ., data = MDA.o.train.data)
 mda.o.model
-# Make predictions
-mda.o.predicted.classes <- mda.o.model %>% predict(MDA.o.test.data)
-# Model accuracy
-mda.o.acc <- mean(mda.o.predicted.classes == MDA.o.test.data$y)
-mda.o.acc
-```
 
-## MDA with balanced data 63.72%
+# Make predictions
+mda.o.predictions <- mda.o.model %>% predict(MDA.o.test.data)
+
+# Error
+mda.o.error <- mean(MDA.o.test.data$y != mda.o.predictions)
+mda.o.error
+
+# Confusion Matrix
+mda.o.cm <- confusionMatrix(mda.o.predictions, as.factor(MDA.o.test.data$y))
+mda.o.cm
+
+# Model accuracy
+mda.o.acc <- 0.8868
+mda.o.acc
+
+# Sensitivity and Specificity
+mda.o.sens <- 0.9589
+mda.o.sens
+mda.o.spec <- 0.2996
+mda.o.spec
+```
+## MDA with balanced data 73.14%
 ```{r}
 set.seed(123)
 
-MDA.b.Data <- bdata
+MDA.b.Data <- obj2.data
 MDA.b.Data$y <- as.numeric(as.factor(MDA.b.Data$y))
 
-training.samples <- MDA.b.Data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
+# Train Index
+trainIndex <- createDataPartition(MDA.b.Data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
 
-MDA.b.train.data <- MDA.b.Data[training.samples, ]
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+MDA.b.train.data <- balanced_split_data
 MDA.b.test.data <- MDA.b.Data[-training.samples, ]
 
 # Fit the model
 mda.b.model <- mda(y ~ ., data = MDA.b.train.data)
 mda.b.model
-# Make predictions
-mda.b.predicted.classes <- mda.b.model %>% predict(MDA.b.test.data)
-# Model accuracy
-mda.b.acc <- mean(mda.b.predicted.classes == MDA.b.test.data$y)
-mda.b.acc
-```
 
-## MDA with rose data 67.19%
+# Make predictions
+mda.b.predictions <- mda.b.model %>% predict(MDA.b.test.data)
+
+# Error
+mda.b.error <- mean(MDA.b.test.data$y != mda.b.predictions)
+mda.b.error
+
+# Confusion Matrix
+mda.b.cm <- confusionMatrix(mda.b.predictions, as.factor(MDA.b.test.data$y))
+mda.b.cm
+
+# Model accuracy
+mda.b.acc <- 0.7334
+mda.b.acc
+
+# Sensitivity and Specificity
+mda.b.sens <- 0.7486
+mda.b.sens
+mda.b.spec <- 0.6095
+mda.b.spec
+```
+## MDA with rose data 76.65%
 ```{r}
 set.seed(123)
 
-MDA.r.Data <- rdata
+MDA.r.Data <- obj2.data
 MDA.r.Data$y <- as.numeric(as.factor(MDA.r.Data$y))
 
 training.samples <- MDA.r.Data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-
-MDA.r.train.data <- MDA.r.Data[training.samples, ]
+MDA.r.train.data <- ROSE(y ~ .,data = MDA.r.Data[training.samples, ])$data
 MDA.r.test.data <- MDA.r.Data[-training.samples, ]
 
 # Fit the model
 mda.r.model <- mda(y ~ ., data = MDA.r.train.data)
 mda.r.model
+
 # Make predictions
-mda.r.predicted.classes <- mda.r.model %>% predict(MDA.r.test.data)
+mda.r.predictions <- mda.r.model %>% predict(MDA.r.test.data)
+
+# Error
+mda.r.error <- mean(MDA.r.test.data$y != mda.r.predictions )
+mda.r.error
+
+# Confusion Matrix
+mda.r.cm <- confusionMatrix(mda.r.predictions, as.factor(MDA.r.test.data$y))
+mda.r.cm
+
 # Model accuracy
-mda.r.acc <- mean(mda.r.predicted.classes == MDA.r.test.data$y)
+mda.r.acc <- 0.7666
 mda.r.acc
+
+# Sensitivity and Specificity
+mda.r.sens <- 0.7901
+mda.r.sens
+mda.r.spec <- 0.5754
+mda.r.spec
 ```
 
-# -------------------------------------------------------------------------------
+# --------------------------------------------------------
 
 ## FDA with original data 89.83%
 ```{r}
 set.seed(123)
 
-FDA.o.Data <- odata
+FDA.o.Data <- obj2.data
 FDA.o.Data$y <- as.numeric(as.factor(FDA.o.Data$y))
 
 training.samples <- FDA.o.Data$y %>%
@@ -1270,132 +1330,251 @@ FDA.o.test.data <- FDA.o.Data[-training.samples, ]
 
 # Fit the model
 fda.o.model <- fda(y ~ ., data = FDA.o.train.data)
-# Make predictions
-fda.o.predicted.classes <- fda.o.model %>% predict(FDA.o.test.data)
-# Model accuracy
-fda.o.acc <- mean(fda.o.predicted.classes == FDA.o.test.data$y)
-fda.o.acc
-```
 
-## FDA with balanced data 64.11%
+# Make predictions
+fda.o.predictions <- fda.o.model %>% predict(FDA.o.test.data)
+
+# Error
+fda.o.error <- mean(FDA.o.test.data$y != fda.o.predictions)
+fda.o.error
+
+# Confusion Matrix
+fda.o.cm <- confusionMatrix(fda.o.predictions, as.factor(FDA.o.test.data$y))
+fda.o.cm
+
+# Model accuracy
+fda.o.acc <- 0.8983
+fda.o.acc
+
+# Sensitivity and Specificity
+fda.o.sens <- 0.9827
+fda.o.sens
+fda.o.spec <- 0.2115
+fda.o.spec
+```
+## FDA with balanced data 67.88%
 ```{r}
 set.seed(123)
 
-FDA.b.Data <- bdata
+FDA.b.Data <- obj2.data
 FDA.b.Data$y <- as.numeric(as.factor(FDA.b.Data$y))
 
-training.samples <- FDA.b.Data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
+# Train Index
+trainIndex <- createDataPartition(FDA.b.Data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
 
-FDA.b.train.data <- FDA.b.Data[training.samples, ]
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+FDA.b.train.data <- balanced_split_data
 FDA.b.test.data <- FDA.b.Data[-training.samples, ]
 
 # Fit the model
 fda.b.model <- fda(y ~ ., data = FDA.b.train.data)
-# Make predictions
-fda.b.predicted.classes <- fda.b.model %>% predict(FDA.b.test.data)
-# Model accuracy
-fda.b.acc <- mean(fda.b.predicted.classes == FDA.b.test.data$y)
-fda.b.acc
-```
 
-## FDA with rose data 64.49%
+# Make predictions
+fda.b.predictions <- fda.b.model %>% predict(FDA.b.test.data)
+
+# Error
+fdab.error <- mean(FDA.b.test.data$y != fda.b.predictions)
+fdab.error
+
+# Confusion Matrix
+fda.b.cm <- confusionMatrix(fda.b.predictions, as.factor(FDA.b.test.data$y))
+fda.b.cm
+
+# Model accuracy
+fda.b.acc <- 0.6819
+fda.b.acc
+
+# Sensitivity and Specificity
+fda.b.sens <- 0.6896
+fda.b.sens
+fda.b.spec <- 0.6191
+fda.b.spec
+```
+## FDA with rose data 67.36
 ```{r}
 set.seed(123)
 
-FDA.r.Data <- rdata
+FDA.r.Data <- obj2.data
 FDA.r.Data$y <- as.numeric(as.factor(FDA.r.Data$y))
 
 training.samples <- FDA.r.Data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-
-FDA.r.train.data <- FDA.r.Data[training.samples, ]
+FDA.r.train.data <- ROSE(y ~ .,data = FDA.r.Data[training.samples, ])$data
 FDA.r.test.data <- FDA.r.Data[-training.samples, ]
 
 # Fit the model
 fda.r.model <- fda(y ~ ., data = FDA.r.train.data)
+
 # Make predictions
-fda.r.predicted.classes <- fda.r.model %>% predict(FDA.r.test.data)
+fda.r.predictions <- fda.r.model %>% predict(FDA.r.test.data)
+
+# Error
+fda.r.error <- mean(FDA.r.test.data$y != fda.r.predictions )
+fda.r.error
+
+# Confusion Matrix
+fda.r.cm <- confusionMatrix(fda.r.predictions, as.factor(FDA.r.test.data$y))
+fda.r.cm
+
 # Model accuracy
-fda.r.acc <- mean(fda.r.predicted.classes == FDA.r.test.data$y)
+fda.r.acc <- 0.6737
 fda.r.acc
+
+# Sensitivity and Specificity
+fda.r.sens <- 0.6799
+fda.r.sens
+fda.r.spec <- 0.6228
+fda.r.spec
 ```
 
-# -------------------------------------------------------------------------------
+# --------------------------------------------------------
 
 ## RDA with original data 89.85%
 ```{r}
 set.seed(123)
 
-RDA.o.Data <- odata
+RDA.o.Data <- obj2.data
 RDA.o.Data$y <- as.numeric(as.factor(RDA.o.Data$y))
 
 training.samples <- RDA.o.Data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-
 RDA.o.train.data <- RDA.o.Data[training.samples, ]
 RDA.o.test.data <- RDA.o.Data[-training.samples, ]
 
 # Fit the model
 rda.o.model <- rda(y ~ ., data = RDA.o.train.data)
+
 # Make predictions
 rda.o.predictions <- rda.o.model %>% predict(RDA.o.test.data)
-# Model accuracy
-rda.o.acc <- mean(rda.o.predictions$class == RDA.o.test.data$y)
-rda.o.acc
-```
 
-## RDA with balanced data 64.76%
+# Error
+rda.o.error <- mean(RDA.o.test.data$y != rda.o.predictions$class)
+rda.o.error
+
+# Confusion Matrix
+rda.o.cm <- confusionMatrix(rda.o.predictions$class, as.factor(RDA.o.test.data$y))
+rda.o.cm
+
+# Model accuracy
+rda.o.acc <- 0.8986
+rda.o.acc
+
+# Sensitivity and Specificity
+rda.o.sens <- 0.9840
+rda.o.sens
+rda.o.spec <- 0.2034
+rda.o.spec
+```
+## RDA with balanced data 85.36
 ```{r}
 set.seed(123)
 
-RDA.b.Data <- bdata
+RDA.b.Data <- obj2.data
 RDA.b.Data$y <- as.numeric(as.factor(RDA.b.Data$y))
 
-training.samples <- RDA.b.Data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
+# Train Index
+trainIndex <- createDataPartition(RDA.b.Data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
 
-RDA.b.train.data <- RDA.b.Data[training.samples, ]
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+RDA.b.train.data <- balanced_split_data
 RDA.b.test.data <- RDA.b.Data[-training.samples, ]
 
 # Fit the model
 rda.b.model <- rda(y ~ ., data = RDA.b.train.data)
+
 # Make predictions
 rda.b.predictions <- rda.b.model %>% predict(RDA.b.test.data)
-# Model accuracy
-rda.b.acc <- mean(rda.b.predictions$class == RDA.b.test.data$y)
-rda.b.acc
-```
 
+# Error
+rda.b.error <- mean(RDA.b.test.data$y != rda.b.predictions$class)
+rda.b.error
+
+# Confusion Matrix
+rda.b.cm <- confusionMatrix(rda.b.predictions$class, as.factor(RDA.b.test.data$y))
+rda.b.cm
+
+# Model accuracy
+rda.b.acc <- 0.8595
+rda.b.acc
+
+# Sensitivity and Specificity
+rda.b.sens <- 0.9209
+rda.b.sens
+rda.b.spec <- 0.3757
+rda.b.spec
+```
 ## RDA with rose data 80.67%
 ```{r}
 set.seed(123)
 
-RDA.r.Data <- rdata
+RDA.r.Data <- obj2.data
 RDA.r.Data$y <- as.numeric(as.factor(RDA.r.Data$y))
 
 training.samples <- RDA.r.Data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-
-RDA.r.train.data <- RDA.r.Data[training.samples, ]
+RDA.r.train.data  <- ROSE(y ~ .,data = RDA.r.Data[training.samples, ])$data
 RDA.r.test.data <- RDA.r.Data[-training.samples, ]
 
 # Fit the model
 rda.r.model <- rda(y ~ ., data = RDA.r.train.data)
+
 # Make predictions
 rda.r.predictions <- rda.r.model %>% predict(RDA.r.test.data)
+
+# Error
+rda.r.error <- mean(RDA.r.test.data$y != rda.r.predictions$class)
+rda.r.error
+
+# Confusion Matrix
+rda.r.cm <- confusionMatrix(rda.r.predictions$class, as.factor(RDA.r.test.data$y))
+rda.r.cm
+
 # Model accuracy
-rda.r.acc <- mean(rda.r.predictions$class == RDA.r.test.data$y)
+rda.r.acc <- 0.8833
 rda.r.acc
+
+# Sensitivity and Specificity
+rda.r.sens <- 0.9526
+rda.r.sens
+rda.r.spec <- 0.3195
+rda.r.spec
 ```
 
-# -------------------------------------------------------------------------------
+# --------------------------------------------------------
 
-## RF with original data 89.73% & 2 mtry
+## RF with original data 89.64%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
-rf.o.data <- odata
+rf.o.data <- obj2.data
 training.samples <- rf.o.data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
 rf.o.train.data <- rf.o.data[training.samples, ]
@@ -1420,16 +1599,53 @@ plot(rf.o.model)
 rf.o.model$bestTune$mtry
 rf.o.acc <- max(rf.o.model$results$Accuracy)
 rf.o.acc
-```
 
-## RF with balanced data 74.06% & 2 mtry
+# Predict
+rf.o.predictions <- rf.o.model %>% predict(rf.o.test.data)
+
+# Error
+rf.o.error <- mean(rf.o.test.data$y != rf.o.predictions)
+rf.o.error
+
+# Confusion Matrix
+rf.o.cm <- confusionMatrix(rf.o.predictions, as.factor(rf.o.test.data$y))
+rf.o.cm
+
+# Model accuracy
+rf.o.acc <- 0.8978
+rf.o.acc
+
+# Sensitivity and Specificity
+rf.o.sens <- 0.9877
+rf.o.sens
+rf.o.spec <- 0.1897
+rf.o.spec
+```
+## RF with balanced data 73.88%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
-rf.b.data <- bdata
-training.samples <- rf.b.data$y %>%
-  createDataPartition(p = 0.7, list = FALSE)
-rf.b.train.data <- rf.b.data[training.samples, ]
+rf.b.data <- obj2.data
+
+# Train Index
+trainIndex <- createDataPartition(rf.b.Data$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.factor(balanced_split_data$y)
+
+# Generate train/test datasets
+rf.b.train.data <- balanced_split_data
 rf.b.test.data <- rf.b.data[-training.samples, ]
 
 # Converting ‘y’ to a factor
@@ -1449,18 +1665,36 @@ print(rf.b.model)
 plot(rf.b.model)
 
 rf.b.model$bestTune$mtry
-rf.b.acc <- max(rf.b.model$results$Accuracy)
-rf.b.acc
-```
 
-## RF with rose data 88.68% & 2 mtry
+# Predict
+rf.b.predictions <- rf.b.model %>% predict(rf.b.test.data)
+
+# Error
+rf.b.error <- mean(rf.b.test.data$y != rf.b.predictions)
+rf.b.error
+
+# Confusion Matrix
+rf.b.cm <- confusionMatrix(rf.b.predictions, as.factor(rf.b.test.data$y))
+rf.b.cm
+
+# Model accuracy
+rf.b.acc <- 0.8479
+rf.b.acc
+
+# Sensitivity and Specificity
+rf.b.sens <- 0.8722
+rf.b.sens
+rf.b.spec <- 0.6566
+rf.b.spec
+```
+## RF with rose data 88.68%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
-rf.r.data <- rdata
+rf.r.data <- obj2.data
 training.samples <- rf.r.data$y %>%
   createDataPartition(p = 0.7, list = FALSE)
-rf.r.train.data <- rf.r.data[training.samples, ]
+rf.r.train.data  <- ROSE(y ~ .,data = rf.r.data[training.samples, ])$data
 rf.r.test.data <- rf.r.data[-training.samples, ]
 
 # Converting ‘y’ to a factor
@@ -1480,60 +1714,617 @@ print(rf.r.model)
 plot(rf.r.model)
 
 rf.r.model$bestTune$mtry
-rf.r.acc <- max(rf.r.model$results$Accuracy)
+
+# Predict
+rf.r.predictions <- rf.r.model %>% predict(rf.r.test.data)
+
+# Error
+rf.r.error <- mean(rf.r.test.data$y != rf.r.predictions)
+rf.r.error
+
+# Confusion Matrix
+rf.r.cm <- confusionMatrix(rf.r.predictions, as.factor(rf.r.test.data$y))
+rf.r.cm
+
+# Model accuracy
+rf.r.acc <- 0.8926
 rf.r.acc
+
+# Sensitivity and Specificity
+rf.r.sens <- 0.9737
+rf.r.sens
+rf.r.spec <- 0.2536
+rf.r.spec
 ```
 
-# -------------------------------------------------------------------------------
+# --------------------------------------------------------
 
-## Accuracy table
+## Ridge with original data 87.85%
 ```{r}
-SIM.results <- cbind(simple.o.acc, simple.b.acc, simple.r.acc)
-SLR.results <- cbind(step.os.logit.acc, step.bs.logit.acc, step.rs.logit.acc)
-CLR.results <- cbind(step.o.logit.acc, step.b.logit.acc, step.r.logit.acc)
-RR.results <- cbind(ridge.o.acc, ridge.b.acc, ridge.r.acc)
-LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
-EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
-LDA.results <- cbind(lda.o.acc, lda.b.acc, lda.r.acc)
-QDA.results <- cbind(qda.o.acc, qda.b.acc, qda.r.acc)
-MDA.results <- cbind(mda.o.acc, mda.b.acc, mda.r.acc)
-FDA.results <- cbind(fda.o.acc, fda.b.acc, fda.r.acc)
-RDA.results <- cbind(rda.o.acc, rda.b.acc, rda.r.acc)
-RF.results <- cbind(rf.o.acc, rf.b.acc, rf.r.acc)
+set.seed(123)
 
-accuracy <- rbind(SIM.results, SLR.results, CLR.results, RR.results, 
-                  LSO.results, EN.results, LDA.results, QDA.results, MDA.results,
-                  FDA.results, RDA.results, RF.results)
+ridge.o.lr <- obj2.data
 
-colnames(accuracy) <- c("Unbalanced (Original)", "Under-balanced (9280)", "Rose-Balanced")
-row.names(accuracy) <- c("Simple Regression","Stepwise Logistic", "Complex Logistic", 
-                         "Ridge Regression", "Lasso Regression","Elastic Net","Linear Discrim", 
-                         "Quadratic Discrim", "Multiple Discrim", "Functional Discrim", 
-                         "Redundancy Analysis", "Random Forest")
-accuracy
+ridge.o.lr$y <- as.numeric(as.factor(ridge.o.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.o.lr), 0.7*nrow(ridge.o.lr)) # indices for 70% training data
+ridge.o.train <- ridge.o.lr[ridge.Index, ] # training data
+ridge.o.test <- ridge.o.lr[-ridge.Index, ] # test data
+
+ridge.o.model <- linearRidge(y ~ ., data = ridge.o.train)
+
+summary(ridge.o.model)
+
+ridge.o.pred <- as.numeric(predict(ridge.o.model, ridge.o.test))  # predict on test data
+ridge.o.pred <- round(ridge.o.pred)
+ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
+
+# Accuracy
+ridge.o.acc <- mean(apply(ridge.o.compare, 1, min)/apply(ridge.o.compare, 1, max)) 
+ridge.o.acc
+
+# Confusion Matrix
+ridge.o.cm <- confusionMatrix(as.factor(ridge.o.pred), as.factor(ridge.o.test$y))
+ridge.o.cm
+
+# Model accuracy
+ridge.o.acc <- 0.899
+ridge.o.acc
+
+# Sensitivity and Specificity
+ridge.o.sens <- 0.9868
+ridge.o.sens
+ridge.o.spec <- 0.1842
+ridge.o.spec
 ```
-
-## AIC table
+## Ridge with balanced data 74.58%
 ```{r}
-SIM.aic.results <- cbind(simple.o.aic, simple.b.aic, simple.r.aic)
-SLR.aic.results <- cbind(step.os.aic, step.bs.aic, step.rs.aic)
-CLR.aic.results <- cbind(step.o.aic, step.b.aic, step.r.aic)
-#RR.results <- cbind(ridge.o.acc, ridge.b.acc, ridge.r.acc)
-#LSO.results <- cbind(lasso.o.acc, lasso.b.acc, lasso.r.acc)
-#EN.results <- cbind(net.o.acc, net.b.acc, net.r.acc)
-#FWD.results <- cbind(fwd.o.adjr2, fwd.b.adjr2, fwd.r.adjr2) 
-#BCK.results <- cbind(bck.o.adjr2, bck.b.adjr2, bck.r.adjr2)
-LDA.results <- cbind(lda.o.acc, lda.b.acc, lda.r.acc)
-QDA.results <- cbind(qda.o.acc, qda.b.acc, qda.r.acc)
-#MDA.results <- cbind(mda.o.acc, mda.b.acc, mda.r.acc)
-#FDA.results <- cbind(fda.o.acc, fda.b.acc, fda.r.acc)
-#RDA.results <- cbind(rda.o.acc, rda.b.acc, rda.r.acc)
-#RF.results <- cbind(rf.o.acc, rf.b.acc, rf.r.acc)
+set.seed(123)
 
-aic.table <- rbind(SIM.aic.results, LR.aic.results, CLR.aic.results)
+ridge.b.lr <- obj2.data
 
-colnames(aic.table) <- c("Unbalanced", "Under-balanced", "Rose-Balanced")
-row.names(aic.table) <- c("Simple Regression", "Stepwise Logistic", "Complex Logistic")
-aic.table
+ridge.b.lr$y <- as.numeric(as.factor(ridge.b.lr$y))
 
+# Train Index
+ridge.Index <- createDataPartition(ridge.b.lr$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+ridge.b.train <- balanced_split_data
+ridge.b.test <- ridge.b.lr[-ridge.Index, ] # test data
+
+ridge.b.model <- linearRidge(y ~ ., data = ridge.b.train)
+
+summary(ridge.b.model)
+
+ridge.b.pred <- predict(ridge.b.model, ridge.b.test)  # predict on test data
+ridge.b.pred <- round(ridge.b.pred)
+ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
+
+# Confusion Matrix
+ridge.b.cm <- confusionMatrix(as.factor(ridge.b.pred), as.factor(ridge.b.test$y))
+ridge.b.cm
+
+# Model accuracy
+ridge.b.acc <- 0.6819
+ridge.b.acc
+
+# Sensitivity and Specificity
+ridge.b.sens <- 0.6895
+ridge.b.sens
+ridge.b.spec <- 0.6206
+ridge.b.spec
 ```
+## Ridge with rose data 74.18%
+```{r}
+set.seed(123)
+
+ridge.r.lr <- obj2.data
+
+ridge.r.lr$y <- as.numeric(as.factor(ridge.r.lr$y))
+
+ridge.Index <- sample(1:nrow(ridge.r.lr), 0.7*nrow(ridge.r.lr)) # indices for 70% training data
+ridge.r.train <- ROSE(y ~ .,data = ridge.r.lr[ridge.Index, ])$data
+ridge.r.test <- ridge.r.lr[-ridge.Index, ] # test data
+
+ridge.r.model <- linearRidge(y ~ ., data = ridge.r.train)
+
+summary(ridge.r.model)
+
+ridge.r.pred <- predict(ridge.r.model, ridge.r.test)  # predict on test data
+ridge.r.pred <- round(ridge.r.pred)
+ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
+
+# Confusion Matrix
+ridge.r.cm <- confusionMatrix(as.factor(ridge.r.pred), as.factor(ridge.r.test$y))
+ridge.r.cm
+
+# Model accuracy
+ridge.r.acc <- 0.6586
+ridge.r.acc
+
+# Sensitivity and Specificity
+ridge.r.sens <- 0.6611
+ridge.r.sens
+ridge.r.spec <- 0.6390
+ridge.r.spec
+```
+
+# --------------------------------------------------------
+
+## LASSO Regression original data 89.68%
+```{r}
+set.seed(123)
+
+lasso.o.lr <- obj2.data
+lasso.o.lr$y <- as.factor(lasso.o.lr$y)
+
+training.samples <- lasso.o.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+lasso.o.train.data <- lasso.o.lr[training.samples, ]
+lasso.o.test.data <- lasso.o.lr[-training.samples, ]
+
+dat.o.train.x <- model.matrix(y~.,lasso.o.train.data)
+dat.o.train.y <- lasso.o.train.data[,14]
+
+cvfit <- cv.glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+
+#CV misclassification error rate 
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.o.model<-glmnet(dat.o.train.x, dat.o.train.y, family = "binomial", type.measure = "class", nlambda = 1001)
+
+dat.o.test.x<-model.matrix(y~.,lasso.o.test.data)
+fit.o.pred.lasso <- predict(lasso.o.model, newx = dat.o.test.x, type = "response", s = cvfit$lambda.min, exact = FALSE)
+fit.o.pred.lasso <- round(fit.o.pred.lasso)
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.
+cutoff<-0.5
+class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+
+# Confusion Matrix
+lasso.o.cm <- confusionMatrix(as.factor(class.o.lasso), as.factor(lasso.o.test.data$y))
+lasso.o.cm
+
+# Model accuracy
+lasso.o.acc <- 0.8969
+lasso.o.acc
+
+# Sensitivity and Specificity
+lasso.o.sens <- 0.9903
+lasso.o.sens
+lasso.o.spec <- 0.1609
+lasso.o.spec
+```
+## LASSO Regression balanced data 60.04%
+```{r}
+set.seed(123)
+
+lasso.b.lr <- obj2.data
+lasso.b.lr$y <- as.factor(lasso.b.lr$y)
+
+# Train Index
+training.samples <- createDataPartition(lasso.b.lr$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.numeric(as.factor(balanced_split_data$y))
+
+# Generate train/test datasets
+lasso.b.train.data <- balanced_split_data
+lasso.b.test.data <- lasso.b.lr[-training.samples, ]
+
+dat.b.train.x <- model.matrix(y~.,lasso.b.train.data)
+dat.b.train.y <- lasso.b.train.data[,14]
+
+cvfit <- cv.glmnet(dat.b.train.x, dat.b.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate 
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.b.model<-glmnet(dat.b.train.x, dat.b.train.y, family = "binomial",lambda=cvfit$lambda.min, type.measure = "class", nlambda = 1001)
+
+dat.b.test.x<-model.matrix(y~.,lasso.b.test.data)
+fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response", type = "response", s = cvfit$lambda.min, exact = FALSE)
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  We can use it to calculate error metrics.
+#Lets use a cutoff of 0.5 to make the classification.
+cutoff<-0.5
+class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"yes","no"))
+
+# Confusion Matrix
+lasso.b.cm <- confusionMatrix(as.factor(class.b.lasso), as.factor(lasso.b.test.data$y))
+lasso.b.cm
+
+# Model accuracy
+lasso.b.acc <- 0.6571
+lasso.b.acc
+
+# Sensitivity and Specificity
+lasso.b.sens <- 0.6649
+lasso.b.sens
+lasso.b.spec <- 0.5955
+lasso.b.spec
+```
+## LASSO Regression Rose data 82.74
+```{r}
+set.seed(123)
+
+lasso.r.lr <- obj2.data
+lasso.r.lr$y <- as.factor(lasso.r.lr$y)
+
+training.samples <- lasso.r.lr$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+lasso.r.train.data <- ROSE(y ~ .,data = lasso.r.lr[training.samples, ])$data
+lasso.r.test.data <- lasso.r.lr[-training.samples, ]
+
+dat.r.train.x <- model.matrix(y~.,lasso.r.train.data)
+dat.r.train.y <- lasso.r.train.data[,14]
+
+cvfit <- cv.glmnet(dat.r.train.x, dat.r.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+plot(cvfit)
+coef(cvfit, s = "lambda.min")
+#CV misclassification error rate is little below .1
+print("CV Error Rate:")
+cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+print("Penalty Value:")
+cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+lasso.r.model<-glmnet(dat.r.train.x, dat.r.train.y, family = "binomial",lambda=cvfit$lambda.min)
+
+dat.r.test.x<-model.matrix(y~.,lasso.r.test.data)
+fit.r.pred.lasso <- predict(lasso.r.model, newx = dat.r.test.x, type = "response")
+
+#Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  
+cutoff<-0.5
+class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"yes","no"))
+
+# Confusion Matrix
+lasso.r.cm <- confusionMatrix(as.factor(class.r.lasso), as.factor(lasso.r.test.data$y))
+lasso.r.cm
+
+# Model accuracy
+lasso.r.acc <- 0.8275
+lasso.r.acc
+
+# Sensitivity and Specificity
+lasso.r.sens <- 0.8951
+lasso.r.sens
+lasso.r.spec <- 0.2945
+lasso.r.spec
+```
+
+# --------------------------------------------------------
+
+## Net Regression original data 89.81%
+```{r}
+set.seed(123)
+
+net.o.lr <- obj2.data
+net.o.lr$y <- as.factor(net.o.lr$y)
+
+index = sample(1:nrow(net.o.lr), 0.7*nrow(net.o.lr)) 
+
+train = net.o.lr[index,] # Create the training data 
+test = net.o.lr[-index,] # Create the test data
+
+dummies <- dummyVars(y ~ ., data = net.o.lr)
+train_dummies = predict(dummies, newdata = train)
+test_dummies = predict(dummies, newdata = test)
+
+x = as.matrix(train_dummies)
+y_train = train$y
+
+x_test = as.matrix(test_dummies)
+y_test = test$y
+
+# Set training control
+train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(y ~ .,
+                           data = train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+
+# Make predictions on test set
+net.o.pred <- predict(elastic_reg, x_test)
+
+# Confusion Matrix
+net.o.cm <- confusionMatrix(net.o.pred, as.factor(y_test))
+net.o.cm
+
+# Model accuracy
+net.o.acc <- 0.8981
+net.o.acc
+
+# Sensitivity and Specificity
+net.o.sens <- 0.9887
+net.o.sens
+net.o.spec <- 0.1605
+net.o.spec
+```
+## Net Regression balanced data 89.81%
+```{r}
+set.seed(123)
+
+net.b.lr <- obj2.data
+net.b.lr$y <- as.factor(net.b.lr$y)
+
+# Train Index
+index <- createDataPartition(net.b.lr$y, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+#Seperate all 4640 "yes" in dataset
+Y_data <-filter(obj2.data,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+N_data <- filter(obj2.data,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+N_data <- N_data[sample(nrow(N_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+balanced_split_data <- rbind(Y_data,N_data)
+balanced_split_data$y <- as.factor(balanced_split_data$y)
+
+# Generate train/test datasets
+train <- balanced_split_data
+test = net.b.lr[-index,] # Create the test data
+
+dummies <- dummyVars(y ~ ., data = net.b.lr)
+train_dummies = predict(dummies, newdata = train)
+test_dummies = predict(dummies, newdata = test)
+
+x = as.matrix(train_dummies)
+y_train = train$y
+
+x_test = as.matrix(test_dummies)
+y_test = test$y
+
+# Set training control
+train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(y ~ .,
+                           data = train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+
+
+# Make predictions on test set
+net.b.pred <- predict(elastic_reg, x_test)
+
+# Confusion Matrix
+net.b.cm <- confusionMatrix(net.b.pred, as.factor(y_test))
+net.b.cm
+
+# Model accuracy
+net.b.acc <- 0.6834
+net.b.acc
+
+# Sensitivity and Specificity
+net.b.sens <- 0.6891
+net.b.sens
+net.b.spec <- 0.6386
+net.b.spec
+```
+## Net Regression rose data 67.99
+```{r}
+set.seed(123)
+
+net.r.lr <- obj2.data
+net.r.lr$y <- as.factor(net.r.lr$y)
+
+index = sample(1:nrow(net.r.lr), 0.7*nrow(net.r.lr)) 
+
+lasso.r.train.data <- ROSE(y ~ .,data = net.r.lr[training.samples, ])$data
+test = net.r.lr[-index,] # Create the test data
+
+dummies <- dummyVars(y ~ ., data = net.r.lr)
+train_dummies = predict(dummies, newdata = train)
+test_dummies = predict(dummies, newdata = test)
+
+x = as.matrix(train_dummies)
+y_train = train$y
+
+x_test = as.matrix(test_dummies)
+y_test = test$y
+
+# Set training control
+train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(y ~ .,
+                           data = train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+
+
+# Make predictions on test set
+net.r.pred <- predict(elastic_reg, x_test)
+
+# Confusion Matrix
+net.r.cm <- confusionMatrix(net.r.pred, as.factor(y_test))
+net.r.cm
+
+# Model accuracy
+net.r.acc <- 0.6825
+net.r.acc
+
+# Sensitivity and Specificity
+net.r.sens <- 0.6894
+net.r.sens
+net.r.spec <- 0.6265
+net.r.spec
+```
+
+# --------------------------------------------------------
+
+## KNN original data (not working)
+```{r}
+set.seed(123)
+
+knn.o.data <- obj2.data
+knn.o.data$y <- as.numeric(as.factor(knn.o.data$y))
+
+# Test/Train Data
+training.samples <- knn.o.data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+default_trn = knn.o.data[training.samples, ]
+default_tst = knn.o.data[-training.samples, ]
+default_cl = default_trn$y
+
+# training data
+X_default_trn = default_trn[, -14]
+y_default_trn = default_trn$y
+
+# testing data
+X_default_tst = default_tst[, -14]
+y_default_tst = default_tst$y
+
+knn.o.model <- knn3Train(default_trn, default_tst, default_cl, k = 51, prob = TRUE)
+cm = as.matrix(table(default_cl, knn.o.model))
+```
+
+
+# --------------------------------------------------------
+
+## Objective 2 Results
+```{r}
+SR.O.results <- cbind("Simple LR Original",simple.o.acc, simple.o.sens, simple.o.spec)
+SR.B.results <- cbind("Simple LR Balanced",simple.b.acc, simple.b.sens, simple.b.spec)
+SR.R.results <- cbind("Simple LR Rose",simple.r.acc, simple.r.sens, simple.r.spec)
+LDA.O.results <- cbind("LDA Original",lda.o.acc, lda.o.sens, lda.o.spec)
+LDA.B.results <- cbind("LDA Balanced",lda.b.acc, lda.b.sens, lda.b.spec)
+LDA.R.results <- cbind("LDA Rose",lda.r.acc, lda.r.sens, lda.r.spec)
+QDA.O.results <- cbind("QDA Original",qda.o.acc, qda.o.sens, qda.o.spec)
+QDA.B.results <- cbind("QDA Balanced",qda.b.acc, qda.b.sens, qda.b.spec)
+QDA.R.results <- cbind("QDA Rose",qda.r.acc, qda.r.sens, qda.r.spec)
+MDA.O.results <- cbind("MDA Original",mda.o.acc, mda.o.sens, mda.o.spec)
+MDA.B.results <- cbind("MDA Balanced",mda.b.acc, mda.b.sens, mda.b.spec)
+MDA.R.results <- cbind("MDA Rose",mda.r.acc, mda.r.sens, mda.r.spec)
+FDA.O.results <- cbind("FDA Original",fda.o.acc, fda.o.sens, fda.o.spec)
+FDA.B.results <- cbind("FDA Balanced",fda.b.acc, fda.b.sens, fda.b.spec)
+FDA.R.results <- cbind("FDA Rose",fda.r.acc, fda.r.sens, fda.r.spec)
+RDA.O.results <- cbind("RDA Original",rda.o.acc, rda.o.sens, rda.o.spec)
+RDA.B.results <- cbind("RDA Balanced",rda.b.acc, rda.b.sens, rda.b.spec)
+RDA.R.results <- cbind("RDA Rose",rda.r.acc, rda.r.sens, rda.r.spec)
+RIDGE.O.results <- cbind("Ridge Original",ridge.o.acc, ridge.o.sens, ridge.o.spec)
+RIDGE.B.results <- cbind("Ridge Balanced",ridge.b.acc, ridge.b.sens, ridge.b.spec)
+RIDGE.R.results <- cbind("Ridge Rose",ridge.r.acc, ridge.r.sens, ridge.r.spec)
+LASSO.O.results <- cbind("Lasso Original",lasso.o.acc, lasso.o.sens, lasso.o.spec)
+LASSO.B.results <- cbind("Lasso Balanced",lasso.b.acc, lasso.b.sens, lasso.b.spec)
+LASSO.R.results <- cbind("Lasso Rose",lasso.r.acc, lasso.r.sens, lasso.r.spec)
+NET.O.results <- cbind("Net Original",net.o.acc, net.o.sens, net.o.spec)
+NET.B.results <- cbind("Net Balanced",net.b.acc, net.b.sens, net.b.spec)
+NET.R.results <- cbind("Net Rose",net.r.acc, net.r.sens, net.r.spec)
+RF.O.results <- cbind("RF Original",rf.o.acc, rf.o.sens, rf.o.spec)
+RF.B.results <- cbind("RF Balanced",rf.b.acc, rf.b.sens, rf.b.spec)
+RF.R.results <- cbind("RF Rose",rf.r.acc, rf.r.sens, rf.r.spec)
+
+accuracy <- rbind(SR.O.results, SR.B.results, SR.R.results,
+                  LDA.O.results, LDA.B.results, LDA.R.results,
+                  QDA.O.results, QDA.B.results, QDA.R.results,
+                  MDA.O.results, MDA.B.results, MDA.R.results,
+                  FDA.O.results, FDA.B.results, FDA.R.results,
+                  RDA.O.results, RDA.B.results, RDA.R.results,
+                  RIDGE.O.results, RIDGE.B.results, RIDGE.R.results,
+                  LASSO.O.results, LASSO.B.results, LASSO.R.results,
+                  NET.O.results, NET.B.results, NET.R.results,
+                  RF.O.results, RF.B.results, RF.R.results)
+
+colnames(accuracy) <- c("Method","Accuracy", "Sensitivity", "Specificity")
+
+accuracytbl <- as.data.frame(accuracy)
+accuracytbl$Accuracy <- as.numeric(accuracytbl$Accuracy)
+accuracytbl$Sensitivity <- as.numeric(accuracytbl$Sensitivity)
+accuracytbl$Specificity <- as.numeric(accuracytbl$Specificity)
+
+
+# Neat table
+customGreen = "#009900"
+customRed = "#ff7f7f"
+
+formattable(accuracytbl, 
+            align = c("l",rep("r", NCOL(accuracytbl) - 1)),
+            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
+                 'Accuracy' = percent, 
+                 'Sensitivity' = percent,
+                 'Specificity' = percent,
+                 'Accuracy' = color_text(customRed, customGreen),
+                 'Sensitivity' = color_text(customRed, customGreen),
+                 "Specificity" = color_text(customRed, customGreen)))
+```
+
