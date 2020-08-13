@@ -343,7 +343,7 @@ step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.os.logit.acc
 ```
 
-### Logit - Full Model - Original data 90.8%
+### Logit - Full Model - Original data 90.8% (DUMP?)
 ```{r}
 set.seed(1234)
 logit.os.Train <- train
@@ -373,7 +373,7 @@ step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.os.logit.acc
 ```
 
-### Logit - Full Model - SMOTE 50- 50 Sampled data 86.6%
+### Logit - Full Model - SMOTE 50- 50 Sampled data 86.6% (DUMP?)
 ```{r}
 set.seed(1234)
 logit.os.Train <- train_down_s_50
@@ -406,7 +406,7 @@ step.os.logit.acc <- sum(diag(conf.step))/sum(conf.step)
 step.os.logit.acc
 ```
 
-### Logit - Full Model - ROSE 85.5%
+### Logit - Full Model - ROSE 85.5% (DUMP?)
 ```{r}
 set.seed(1234)
 logit.os.Train <- train_bal_r
@@ -443,9 +443,9 @@ step.os.logit.acc
 2. From the full model and the significant predictors from step wise model and taking into account the correlated predictors
    below are the some of the models.
 
-## Logit - Reduced Model 7(job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
-## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.157332, AUC - 0.7119
-```{r reduced model 7}
+## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
+## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.192780, AUC - 0.7387
+```{r reduced model 6}
 set.seed(1234)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
@@ -453,9 +453,9 @@ str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
 # Build Full Model
-red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
+red.mod6.log <- glm(y ~ job + education  +  campaign  + poutcome + nr.employed , family="binomial",data=logit.os.Train)
 # Step Model
-step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
+step.os.log <- red.mod6.log %>% stepAIC(trace=FALSE)
 # Model Summary
 summary(step.os.log)
 # Error Metrics
@@ -467,19 +467,24 @@ exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level =
 vif(step.os.log)
 # Predictions & Accuracy
 fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
-cutoff <- 0.5
-class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
+cutoff<-0.5
+class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
 confusionMatrix(as.factor(class.step), logit.os.Test$y)
 
-obj1.mod.acc <- 0.842
-obj1.mod.sens <- 0.894
-obj1.mod.spec <- 0.441
+obj1.mod.acc <- 0.8072
+obj1.mod.sens <- 0.8373
+obj1.mod.spec <- 0.5704
 
 #MisCalc Rates
 misClasificError <- mean(class.step != logit.os.Test$y)
 print("Miscalculation Rate")
 misClasificError
+
+# Metrics
+sum(diag(conf.step))/sum(conf.step)
+sensitivity(class.step, logit.os.Test$y,threshold = cutoff)
+specificity(class.step,logit.os.Test$y,threshold = cutoff)
 
 # Roc Curves & value
 p <- predict(step.os.log, newdata=logit.os.Test, type="response")
@@ -490,15 +495,6 @@ auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
 plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
-
-# Leverage plots
-par(mfrow=c(2,2))
-plot(step.os.log)
-
-residuals2 <- step.os.log$residuals
-write.table(residuals2, file = "residuals.txt", sep = "\t")
-
-
 ```
 
 ## Logit - Reduced Model 1(job,month,campaign,pdays,poutcome,emp.var.rate,cons.price.idx) 
@@ -645,9 +641,9 @@ auc
 plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
-## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
-## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.192780, AUC - 0.7387
-```{r reduced model 6}
+## Logit - Reduced Model 7(job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
+## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.157332, AUC - 0.7119
+```{r reduced model 7}
 set.seed(1234)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
@@ -655,9 +651,9 @@ str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
 # Build Full Model
-red.mod6.log <- glm(y ~ job + education  +  campaign  + poutcome + nr.employed , family="binomial",data=logit.os.Train)
+red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
 # Step Model
-step.os.log <- red.mod6.log %>% stepAIC(trace=FALSE)
+step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
 # Model Summary
 summary(step.os.log)
 # Error Metrics
@@ -669,8 +665,8 @@ exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level =
 vif(step.os.log)
 # Predictions & Accuracy
 fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
-cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
+cutoff <- 0.5
+class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
 confusionMatrix(as.factor(class.step), logit.os.Test$y)
 
@@ -678,11 +674,6 @@ confusionMatrix(as.factor(class.step), logit.os.Test$y)
 misClasificError <- mean(class.step != logit.os.Test$y)
 print("Miscalculation Rate")
 misClasificError
-
-# Metrics
-sum(diag(conf.step))/sum(conf.step)
-sensitivity(class.step, logit.os.Test$y,threshold = cutoff)
-specificity(class.step,logit.os.Test$y,threshold = cutoff)
 
 # Roc Curves & value
 p <- predict(step.os.log, newdata=logit.os.Test, type="response")
@@ -693,6 +684,15 @@ auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
 plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+
+# Leverage plots
+par(mfrow=c(2,2))
+plot(step.os.log)
+
+residuals2 <- step.os.log$residuals
+write.table(residuals2, file = "residuals.txt", sep = "\t")
+
+
 ```
 
 ## Logit - Reduced Model 3(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
@@ -773,15 +773,86 @@ specificity(class.step,logit.os.Test$y,threshold = cutoff)
 # -----------------------------------------------------------------------------
 
 # Objective 2
-## Final Datasets to be used in objective 2
+
+## ANOVA
+```{r}
+# Anova Table
+res.aov2 <- aov(as.numeric(y) ~ job + education + campaign + poutcome + nr.employed, data = imputed)
+summary(res.aov2)
+```
+
+## Logit Round 2 - Interactive Model (job,education,campaign,poutcome,nr.employed)
+## Objective 1 model with added complexity
+## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.192780, AUC - 0.7387
+```{r Objective 1 complex model}
+set.seed(1234)
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+
+# Analyzing interaction terms to determine ideal ones to put in the model
+# The ^2 runs the two way anova on all the variables
+lm.fit2=lm(as.numeric(y) ~ (job + education + campaign + poutcome + nr.employed)^2,data=logit.os.Train)
+anova(lm.fit2)
+
+# Build Full Model
+red.mod7.log <- glm(y ~ job + education + campaign + poutcome + 
+                      job*education + job*campaign + education*campaign  + campaign*nr.employed + 
+                      education*nr.employed, family="binomial", data=logit.os.Train)
+
+# Step Model
+step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
+# Model Summary
+summary(step.os.log)
+# Error Metrics
+step.os.aic <- step.os.log$aic
+step.os.aic
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+# VIF Scores
+vif(step.os.log)
+# Predictions & Accuracy
+fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+cutoff <- 0.5
+class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+confusionMatrix(as.factor(class.step), logit.os.Test$y)
+
+obj1.mod2.acc <- 0.7945
+obj1.mod2.sens <- 0.8223
+obj1.mod2.spec <- 0.5754
+
+#MisCalc Rates
+misClasificError <- mean(class.step != logit.os.Test$y)
+print("Miscalculation Rate")
+misClasificError
+
+# Roc Curves & value
+p <- predict(step.os.log, newdata=logit.os.Test, type="response")
+pr <- prediction(p, logit.os.Test$y)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+
+# Leverage plots
+par(mfrow=c(2,2))
+plot(step.os.log)
+```
+
+# --------------------------------------------------------
+
+## Final Datasets to be used in the rest of the models
 ```{r}
 set.seed(123)
 
 # Select transformations
 EDAD2 <- EDAD
 EDAD2$pdays <- ifelse(EDAD2$pdays == 999, -1, EDAD2$pdays)
-EDAD2$age <- log(EDAD2$age)
-
 
 # EDA dataset - narrowed down to columns to be used in regression
 edadata <- EDAD2
@@ -804,77 +875,7 @@ edadata2 <- japply(edadata2, which(sapply(edadata2, class)=="integer"), as.numer
 lda.qda.data <- edadata2
 ```
 
-# --------------------------------------------------------
-
-# ANOVA
-```{r}
-# Anova Table
-res.aov2 <- aov(as.numeric(y) ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, data = imputed)
-summary(res.aov2)
-```
-
-
-## Logit Round 2 - Interactive Model (job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
-## Objective 1 model with added complexity
-## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.157332, AUC - 0.7119
-```{r Objective 1 complex model}
-set.seed(1234)
-logit.os.Train <- train_bal_s_60
-summary(logit.os.Train)
-str(logit.os.Train)
-logit.os.Test <- test
-logit.os.Train$y <- as.factor(logit.os.Train$y)
-
-# Build Full Model
-red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
-# Step Model
-step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
-# Model Summary
-summary(step.os.log)
-# Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
-# VIF Scores
-vif(step.os.log)
-# Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
-cutoff <- 0.5
-class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
-print("Confusion matrix for Stepwise")
-confusionMatrix(as.factor(class.step), logit.os.Test$y)
-
-obj1.mod2.acc <- 0.842
-obj1.mod2.sens <- 0.894
-obj1.mod2.spec <- 0.441
-
-#MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
-print("Miscalculation Rate")
-misClasificError
-
-# Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
-# TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
-
-# Leverage plots
-par(mfrow=c(2,2))
-plot(step.os.log)
-
-
-m2 <- lm(as.numeric(y) ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, data = logit.os.Train)
-l2 <- multcomp::glht(m2, linfct = mcp(y = "Tukey"))
-summary(l2)
-```
-
-# --------------------------------------------------------
+# -------------------------------------------------------
 
 ## Simple with original 87.85%
 ```{r}
@@ -2438,8 +2439,7 @@ y_default_tst = default_tst$y
 knn.o.model <- knn3Train(default_trn, default_tst, default_cl, k = 51, prob = TRUE)
 cm = as.matrix(table(default_cl, knn.o.model))
 ```
-
-## KNN
+## KNN (not working)
 ```{r}
 knn.o.data <- obj2.data
 knn.o.data$y <- as.numeric(as.factor(knn.o.data$y))
@@ -2486,6 +2486,7 @@ confusionMatrix(table(classifications,test$y))
 ## Objective 2 Results
 ```{r}
 OBJ1.results <- cbind("Objective 1 Model", obj1.mod.acc, obj1.mod.sens, obj1.mod.spec)
+OBJ12.results <- cbind("Complex Obj 1 Model", obj1.mod2.acc, obj1.mod2.sens, obj1.mod2.spec)
 SR.O.results <- cbind("Simple LR Original",simple.o.acc, simple.o.sens, simple.o.spec)
 SR.B.results <- cbind("Simple LR Balanced",simple.b.acc, simple.b.sens, simple.b.spec)
 SR.R.results <- cbind("Simple LR Rose",simple.r.acc, simple.r.sens, simple.r.spec)
@@ -2517,7 +2518,7 @@ RF.O.results <- cbind("RF Original",rf.o.acc, rf.o.sens, rf.o.spec)
 RF.B.results <- cbind("RF Balanced",rf.b.acc, rf.b.sens, rf.b.spec)
 RF.R.results <- cbind("RF Rose",rf.r.acc, rf.r.sens, rf.r.spec)
 
-accuracy <- rbind(OBJ1.results,
+accuracy <- rbind(OBJ1.results, OBJ12.results,
                   SR.O.results, SR.B.results, SR.R.results,
                   LDA.O.results, LDA.B.results, LDA.R.results,
                   QDA.O.results, QDA.B.results, QDA.R.results,
