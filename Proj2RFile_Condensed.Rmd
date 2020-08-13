@@ -877,7 +877,8 @@ lda.qda.data <- edadata2
 
 # -------------------------------------------------------
 
-## Simple with original 87.85%
+## Simple with original
+## Accuracy - 88.9%, Sensitivity - 98.7, Specificity - 18.4
 ```{r}
 set.seed(123)
 
@@ -906,22 +907,23 @@ summary(simple.o.lm)
 actuals_preds <- data.frame(cbind(actuals=simple.o.test$y, predicteds=simple.o.pred))
 min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
 mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.o.acc <- min_max_accuracy
-simple.o.acc
-mape
 
 # Error
 simple.o.error <- mean(simple.o.test$y != simple.o.pred)
 simple.o.error
 
 # Confusion Matrix
-simple.o.cm <- confusionMatrix(simple.o.pred, simple.o.test$y)
+simple.o.cm <- confusionMatrix(as.factor(simple.o.pred), as.factor(simple.o.test$y))
 simple.o.cm
 
+# Accuracy
+simple.o.acc <- 0.8989
+simple.o.acc
+
 # Sensitivity and Specificity
-simple.o.sens <- (251)/(251+147)
-simple.o.sens
-simple.o.spec <- (10858)/(10858+1101)
+simple.o.sens <- 0.9867
+simple.o.sens 
+simple.o.spec <- 0.1842
 simple.o.spec
 
 # MisCalc Rates
@@ -938,7 +940,8 @@ simple.o.auc
 
 vif(simple.o.lm)
 ```
-## Simple with balanced data 84.09%
+## Simple with balanced
+## Accuracy - 67.4%, Sensitivity - 67.9, Specificity - 63.0
 ```{r}
 set.seed(123)
 
@@ -982,8 +985,7 @@ summary(simple.b.lm)
 actuals_preds <- data.frame(cbind(actuals=simple.b.test$y, predicteds=simple.b.pred))
 min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
 mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.b.acc <- min_max_accuracy
-simple.b.acc
+
 mape
 
 # Error
@@ -991,12 +993,17 @@ simple.b.error <- mean(simple.b.test$y != simple.b.pred)
 simple.b.error
 
 # Confusion Matrix
-table(simple.b.test$y, simple.b.pred)
+simple.b.cm <- confusionMatrix(as.factor(simple.b.pred), as.factor(simple.b.test$y))
+simple.b.cm
+
+# Accuracy
+simple.b.acc <- 0.8989
+simple.b.acc
 
 # Sensitivity and Specificity
-simple.b.sens <- (7589)/(7589+3416)
-simple.b.sens
-simple.b.spec <- (837)/(837+515)
+simple.b.sens <- 0.9867
+simple.b.sens 
+simple.b.spec <- 0.1842
 simple.b.spec
 
 # MisCalc Rates
@@ -1014,7 +1021,8 @@ simple.b.auc
 
 vif(simple.b.lm)
 ```
-## Simple with rose data 83.28
+## Simple with rose 83.28
+## Accuracy - 66.8%, Sensitivity - 67.4, Specificity - 62.3
 ```{r}
 set.seed(123)
 
@@ -1047,18 +1055,21 @@ simple.r.error
 actuals_preds <- data.frame(cbind(actuals=simple.r.test$y, predicteds=simple.r.pred))
 min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
 mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
-simple.r.acc <- min_max_accuracy
-simple.r.acc
 mape
 
 # Confusion Matrix
-table(simple.r.test$y, simple.r.pred)
+simple.r.cm <- confusionMatrix(as.factor(simple.r.pred), as.factor(simple.r.test$y))
+simple.r.cm
+
+# Accuracy
+simple.b.acc <- 0.6682
+simple.b.acc
 
 # Sensitivity and Specificity
-simple.r.sens <- (7380)/(7380+3625)
-simple.r.sens
-simple.r.spec <- (845)/(845+507)
-simple.r.spec
+simple.b.sens <- 0.6738
+simple.b.sens 
+simple.b.spec <- 0.6228
+simple.b.spec
 
 # MisCalc Rates
 simple.r.misc <- mean(simple.r.pred != simple.r.test$y)
@@ -1078,7 +1089,8 @@ vif(simple.r.lm)
 
 # --------------------------------------------------------
 
-## LDA with original data 89.69%... Continious ONLY!
+## LDA with original... Continious ONLY!
+## Accuracy - 88.9%, Sensitivity - 95.9, Specificity - 32.9
 ```{r}
 set.seed(123)
 
@@ -1124,7 +1136,8 @@ lda.o.sens
 lda.o.spec <- 0.3291
 lda.o.spec
 ```
-## LDA with balanced data 67.16%... Continious ONLY!
+## LDA with balanced... Continious ONLY!
+## Accuracy - 72.4%, Sensitivity - 72.7, Specificity - 69.9
 ```{r}
 set.seed(123)
 
@@ -1187,7 +1200,8 @@ lda.b.sens
 lda.b.spec <- 0.6997
 lda.b.spec
 ```
-## LDA with rose data 69.25%... Continious ONLY!
+## LDA with rose data... Continious ONLY!
+## Accuracy - 72.5%, Sensitivity - 72.6, Specificity - 71.8
 ```{r}
 set.seed(123)
 
@@ -1235,7 +1249,8 @@ lda.r.spec
 
 # --------------------------------------------------------
 
-## QDA with original data 88.17%... Continious ONLY!
+# QDA with original data.. Continious ONLY!
+## Accuracy - 87.5%, Sensitivity - 92.2, Specificity - 48.9
 ```{r}
 set.seed(123)
 
@@ -1272,7 +1287,8 @@ qda.o.sens
 qda.o.spec <- 0.4889
 qda.o.spec
 ```
-## QDA with balanced data 87.39%... Continious ONLY!
+## QDA with balanced data... Continious ONLY!
+## Accuracy - 87.1%, Sensitivity - 91.3, Specificity - 53.3
 ```{r}
 set.seed(123)
 
@@ -1326,7 +1342,8 @@ qda.b.sens
 qda.b.spec <- 0.5333
 qda.b.spec
 ```
-## QDA with rose data 87.93%... Continious ONLY!
+## QDA with rose data... Continious ONLY!
+## Accuracy - 87.6%, Sensitivity - 92.7, Specificity - 46.2
 ```{r}
 set.seed(123)
 
