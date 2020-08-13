@@ -783,7 +783,7 @@ summary(res.aov2)
 
 ## Logit Round 2 - Interactive Model (job,education,campaign,poutcome,nr.employed)
 ## Objective 1 model with added complexity
-## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.192780, AUC - 0.7387
+## Accuracy - 79.5%, Sensitivity - 82.2, Specificity - 57.5, MC - 0.20547, AUC - 0.7385
 ```{r Objective 1 complex model}
 set.seed(1234)
 logit.os.Train <- train_bal_s_60
