@@ -1062,14 +1062,14 @@ simple.r.cm <- confusionMatrix(as.factor(simple.r.pred), as.factor(simple.r.test
 simple.r.cm
 
 # Accuracy
-simple.b.acc <- 0.6682
-simple.b.acc
+simple.r.acc <- 0.6682
+simple.r.acc
 
 # Sensitivity and Specificity
-simple.b.sens <- 0.6738
-simple.b.sens 
-simple.b.spec <- 0.6228
-simple.b.spec
+simple.r.sens <- 0.6738
+simple.r.sens 
+simple.r.spec <- 0.6228
+simple.r.spec
 
 # MisCalc Rates
 simple.r.misc <- mean(simple.r.pred != simple.r.test$y)
@@ -1090,7 +1090,7 @@ vif(simple.r.lm)
 # --------------------------------------------------------
 
 ## LDA with original... Continious ONLY!
-## Accuracy - 88.9%, Sensitivity - 95.9, Specificity - 32.9
+## Accuracy - 88.9%, Sensitivity - 95.9%, Specificity - 32.9%
 ```{r}
 set.seed(123)
 
@@ -1137,7 +1137,7 @@ lda.o.spec <- 0.3291
 lda.o.spec
 ```
 ## LDA with balanced... Continious ONLY!
-## Accuracy - 72.4%, Sensitivity - 72.7, Specificity - 69.9
+## Accuracy - 72.4%, Sensitivity - 72.7%, Specificity - 69.9%
 ```{r}
 set.seed(123)
 
@@ -1200,8 +1200,8 @@ lda.b.sens
 lda.b.spec <- 0.6997
 lda.b.spec
 ```
-## LDA with rose data... Continious ONLY!
-## Accuracy - 72.5%, Sensitivity - 72.6, Specificity - 71.8
+## LDA with rose... Continious ONLY!
+## Accuracy - 72.5%, Sensitivity - 72.6%, Specificity - 71.8%
 ```{r}
 set.seed(123)
 
@@ -1249,7 +1249,7 @@ lda.r.spec
 
 # --------------------------------------------------------
 
-# QDA with original data.. Continious ONLY!
+# QDA with original... Continious ONLY!
 ## Accuracy - 87.5%, Sensitivity - 92.2, Specificity - 48.9
 ```{r}
 set.seed(123)
@@ -1287,7 +1287,7 @@ qda.o.sens
 qda.o.spec <- 0.4889
 qda.o.spec
 ```
-## QDA with balanced data... Continious ONLY!
+## QDA with balanced... Continious ONLY!
 ## Accuracy - 87.1%, Sensitivity - 91.3, Specificity - 53.3
 ```{r}
 set.seed(123)
@@ -1342,7 +1342,7 @@ qda.b.sens
 qda.b.spec <- 0.5333
 qda.b.spec
 ```
-## QDA with rose data... Continious ONLY!
+## QDA with rose... Continious ONLY!
 ## Accuracy - 87.6%, Sensitivity - 92.7, Specificity - 46.2
 ```{r}
 set.seed(123)
@@ -1384,7 +1384,8 @@ qda.r.spec
 
 # --------------------------------------------------------
 
-## MDA with original data 88.69%
+## MDA with original
+## Accuracy - 89.8%, Sensitivity - 98.2%, Specificity - 21.1%
 ```{r}
 set.seed(123)
 
@@ -1413,16 +1414,17 @@ mda.o.cm <- caret::confusionMatrix(mda.o.predictions, as.factor(MDA.o.test.data$
 mda.o.cm
 
 # Model accuracy
-mda.o.acc <- 0.8868
+mda.o.acc <- 0.8979
 mda.o.acc
 
 # Sensitivity and Specificity
-mda.o.sens <- 0.9589
+mda.o.sens <- 0.9823
 mda.o.sens
-mda.o.spec <- 0.2996
+mda.o.spec <- 0.2108
 mda.o.spec
 ```
-## MDA with balanced data 73.14%
+## MDA with balanced
+## Accuracy - 68.9%, Sensitivity - 69.7%, Specificity - 63.0%
 ```{r}
 set.seed(123)
 
@@ -1466,16 +1468,17 @@ mda.b.cm <- caret::confusionMatrix(mda.b.predictions, as.factor(MDA.b.test.data$
 mda.b.cm
 
 # Model accuracy
-mda.b.acc <- 0.7334
+mda.b.acc <- 0.6897
 mda.b.acc
 
 # Sensitivity and Specificity
-mda.b.sens <- 0.7486
+mda.b.sens <- 0.6970
 mda.b.sens
-mda.b.spec <- 0.6095
+mda.b.spec <- 0.6302
 mda.b.spec
 ```
-## MDA with rose data 76.65%
+## MDA with rose
+## Accuracy - 77.5%, Sensitivity - 80.8%, Specificity - 50.7%
 ```{r}
 set.seed(123)
 
@@ -1503,19 +1506,20 @@ mda.r.cm <- caret::confusionMatrix(mda.r.predictions, as.factor(MDA.r.test.data$
 mda.r.cm
 
 # Model accuracy
-mda.r.acc <- 0.7666
+mda.r.acc <- 0.7749
 mda.r.acc
 
 # Sensitivity and Specificity
-mda.r.sens <- 0.7901
+mda.r.sens <- 0.8079
 mda.r.sens
-mda.r.spec <- 0.5754
+mda.r.spec <- 0.5067
 mda.r.spec
 ```
 
 # --------------------------------------------------------
 
-## FDA with original data 89.83%
+## FDA with original
+## Accuracy - 89.8%, Sensitivity - 98.3%, Specificity - 21.1%
 ```{r}
 set.seed(123)
 
@@ -1543,16 +1547,17 @@ fda.o.cm <- caret::confusionMatrix(fda.o.predictions, as.factor(FDA.o.test.data$
 fda.o.cm
 
 # Model accuracy
-fda.o.acc <- 0.8983
+fda.o.acc <- 0.8981
 fda.o.acc
 
 # Sensitivity and Specificity
-fda.o.sens <- 0.9827
+fda.o.sens <- 0.9826
 fda.o.sens
-fda.o.spec <- 0.2115
+fda.o.spec <- 0.2108
 fda.o.spec
 ```
-## FDA with balanced data 67.88%
+## FDA with balanced
+## Accuracy - 68.3%, Sensitivity - 69.2%, Specificity - 61.7%
 ```{r}
 set.seed(123)
 
@@ -1595,7 +1600,7 @@ fda.b.cm <- caret::confusionMatrix(fda.b.predictions, as.factor(FDA.b.test.data$
 fda.b.cm
 
 # Model accuracy
-fda.b.acc <- 0.6819
+fda.b.acc <- 0.6834
 fda.b.acc
 
 # Sensitivity and Specificity
@@ -1604,7 +1609,8 @@ fda.b.sens
 fda.b.spec <- 0.6191
 fda.b.spec
 ```
-## FDA with rose data 67.36
+## FDA with rose
+## Accuracy - 67.5%, Sensitivity - 68.2%, Specificity - 61.8%
 ```{r}
 set.seed(123)
 
@@ -1631,19 +1637,20 @@ fda.r.cm <- caret::confusionMatrix(fda.r.predictions, as.factor(FDA.r.test.data$
 fda.r.cm
 
 # Model accuracy
-fda.r.acc <- 0.6737
+fda.r.acc <- 0.6746
 fda.r.acc
 
 # Sensitivity and Specificity
-fda.r.sens <- 0.6799
+fda.r.sens <- 0.6816
 fda.r.sens
-fda.r.spec <- 0.6228
+fda.r.spec <- 0.6176
 fda.r.spec
 ```
 
 # --------------------------------------------------------
 
-## RDA with original data 89.85%
+## RDA with original
+## Accuracy - 89.8%, Sensitivity - 98.3%, Specificity - 20.8%
 ```{r}
 set.seed(123)
 
@@ -1674,12 +1681,13 @@ rda.o.acc <- 0.8986
 rda.o.acc
 
 # Sensitivity and Specificity
-rda.o.sens <- 0.9840
+rda.o.sens <- 0.9835
 rda.o.sens
-rda.o.spec <- 0.2034
+rda.o.spec <- 0.2078
 rda.o.spec
 ```
-## RDA with balanced data 85.36
+## RDA with balanced
+## Accuracy - 68.3%, Sensitivity - 69.2%, Specificity - 61.7%
 ```{r}
 set.seed(123)
 
@@ -1722,16 +1730,17 @@ rda.b.cm <- caret::confusionMatrix(rda.b.predictions$class, as.factor(RDA.b.test
 rda.b.cm
 
 # Model accuracy
-rda.b.acc <- 0.8618
+rda.b.acc <- 0.6834
 rda.b.acc
 
 # Sensitivity and Specificity
-rda.b.sens <- 0.9202
+rda.b.sens <- 0.6916
 rda.b.sens
-rda.b.spec <- 0.3868
+rda.b.spec <- 0.6169
 rda.b.spec
 ```
-## RDA with rose data 80.67%
+## RDA with rose
+## Accuracy - 87.9%, Sensitivity - 94.3%, Specificity - 35.4%
 ```{r}
 set.seed(123)
 
@@ -1758,19 +1767,20 @@ rda.r.cm <- caret::confusionMatrix(rda.r.predictions$class, as.factor(RDA.r.test
 rda.r.cm
 
 # Model accuracy
-rda.r.acc <- 0.8833
+rda.r.acc <- 0.8788
 rda.r.acc
 
 # Sensitivity and Specificity
-rda.r.sens <- 0.9526
+rda.r.sens <- 0.9433
 rda.r.sens
-rda.r.spec <- 0.3195
+rda.r.spec <- 0.3543
 rda.r.spec
 ```
 
 # --------------------------------------------------------
 
-## RF with original data 89.64%
+## RF with original
+## Accuracy - 89.7%, Sensitivity - 98.6%, Specificity - 19.5%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
@@ -1812,16 +1822,17 @@ rf.o.cm <- caret::confusionMatrix(rf.o.predictions, as.factor(rf.o.test.data$y))
 rf.o.cm
 
 # Model accuracy
-rf.o.acc <- 0.8978
+rf.o.acc <- 0.8968
 rf.o.acc
 
 # Sensitivity and Specificity
-rf.o.sens <- 0.9877
+rf.o.sens <- 0.9860
 rf.o.sens
-rf.o.spec <- 0.1897
+rf.o.spec <- 0.1947
 rf.o.spec
 ```
-## RF with balanced data 73.88%
+## RF with balanced
+## Accuracy - 85.2%, Sensitivity - 87.6%, Specificity - 66.2%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
@@ -1878,16 +1889,17 @@ rf.b.cm <- caret::confusionMatrix(rf.b.predictions, as.factor(rf.b.test.data$y))
 rf.b.cm
 
 # Model accuracy
-rf.b.acc <- 0.8501
+rf.b.acc <- 0.8516
 rf.b.acc
 
 # Sensitivity and Specificity
-rf.b.sens <- 0.8734
+rf.b.sens <- 0.8756
 rf.b.sens
-rf.b.spec <- 0.6667
+rf.b.spec <- 0.6624
 rf.b.spec
 ```
-## RF with rose data 88.68%
+## RF with rose
+## Accuracy - 89.4%, Sensitivity - 97.4%, Specificity - 26.25%
 ```{r}
 # Split the data into training (70%) and test set (30%)
 set.seed(123)
@@ -1927,19 +1939,20 @@ rf.r.cm <- caret::confusionMatrix(rf.r.predictions, as.factor(rf.r.test.data$y))
 rf.r.cm
 
 # Model accuracy
-rf.r.acc <- 0.8926
+rf.r.acc <- 0.8941
 rf.r.acc
 
 # Sensitivity and Specificity
-rf.r.sens <- 0.9737
+rf.r.sens <- 0.9744
 rf.r.sens
-rf.r.spec <- 0.2536
+rf.r.spec <- 0.2622
 rf.r.spec
 ```
 
 # --------------------------------------------------------
 
-## Ridge with original data 87.85%
+## Ridge with original
+## Accuracy - 89.9%, Sensitivity - 98.7%, Specificity - 18.3%
 ```{r}
 set.seed(123)
 
@@ -1974,10 +1987,11 @@ ridge.o.acc
 # Sensitivity and Specificity
 ridge.o.sens <- 0.9868
 ridge.o.sens
-ridge.o.spec <- 0.1842
+ridge.o.spec <- 0.1834
 ridge.o.spec
 ```
-## Ridge with balanced data 74.58%
+## Ridge with balanced
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2028,7 +2042,8 @@ ridge.b.sens
 ridge.b.spec <- 0.6206
 ridge.b.spec
 ```
-## Ridge with rose data 74.18%
+## Ridge with rose
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2065,7 +2080,8 @@ ridge.r.spec
 
 # --------------------------------------------------------
 
-## LASSO Regression original data 89.68%
+## LASSO Regression original
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2117,7 +2133,8 @@ lasso.o.sens
 lasso.o.spec <- 0.1609
 lasso.o.spec
 ```
-## LASSO Regression balanced data 60.04%
+## LASSO Regression balanced
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2183,7 +2200,8 @@ lasso.b.sens
 lasso.b.spec <- 0.6401
 lasso.b.spec
 ```
-## LASSO Regression Rose data 82.74
+## LASSO Regression Rose
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2236,7 +2254,8 @@ lasso.r.spec
 
 # --------------------------------------------------------
 
-## Net Regression original data 89.81%
+## Net Regression original
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2294,7 +2313,8 @@ net.o.sens
 net.o.spec <- 0.1605
 net.o.spec
 ```
-## Net Regression balanced data 68.34%
+## Net Regression balanced
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
@@ -2369,7 +2389,8 @@ net.b.sens
 net.b.spec <- 0.6386
 net.b.spec
 ```
-## Net Regression rose data 67.99
+## Net Regression rose
+## Accuracy - %, Sensitivity - %, Specificity - %
 ```{r}
 set.seed(123)
 
