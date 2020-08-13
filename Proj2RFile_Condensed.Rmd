@@ -493,7 +493,11 @@ plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 
 # Leverage plots
 par(mfrow=c(2,2))
-plot(step.os.log) 
+plot(step.os.log)
+
+residuals2 <- step.os.log$residuals
+write.table(residuals2, file = "residuals.txt", sep = "\t")
+
 
 ```
 
@@ -802,6 +806,14 @@ lda.qda.data <- edadata2
 
 # --------------------------------------------------------
 
+# ANOVA
+```{r}
+# Anova Table
+res.aov2 <- aov(as.numeric(y) ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, data = imputed)
+summary(res.aov2)
+```
+
+
 ## Logit Round 2 - Interactive Model (job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
 ## Objective 1 model with added complexity
 ## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.157332, AUC - 0.7119
@@ -812,8 +824,9 @@ summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
-red.mod7.log <- glm(y ~job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
+red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
 # Step Model
 step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
 # Model Summary
@@ -853,8 +866,12 @@ plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 
 # Leverage plots
 par(mfrow=c(2,2))
-plot(step.os.log) 
+plot(step.os.log)
 
+
+m2 <- lm(as.numeric(y) ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, data = logit.os.Train)
+l2 <- multcomp::glht(m2, linfct = mcp(y = "Tukey"))
+summary(l2)
 ```
 
 # --------------------------------------------------------
