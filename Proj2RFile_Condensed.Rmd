@@ -137,6 +137,9 @@ imputed$poutcome <- as.numeric(imputed$poutcome)
 imputed$day_of_week <- as.numeric(imputed$day_of_week)
 
 EDAD <- imputed
+
+EDAD_conti <- mktg_imp[, !sapply(imputed, is.factor)]
+EDAD_categ <- mktg_imp[, sapply(imputed, is.factor)]
 ```
 
 ## EDA (don't bulk run. Open and pick plot)
@@ -174,6 +177,95 @@ x
 # Pairs plot. Colored by Yes/No (LONG RUN TIME)
 #pairs(EDAD[1:20],main="Whole Dataset", pch=19, col=as.numeric(EDAD$y)+1)
 #mtext("y column: red-> Yes; green-> No", 1, line=3.7,cex=.8)
+```
+
+
+## EDA Box plots, Scatter plots, Correlation plots
+```{r EDA - Box plots, Scatter plots, Correlation plots}
+
+
+# Box plots to find outliers
+boxplot(EDAD_conti, main ='Box plot - all variables'))
+ggplot(stack(EDAD_conti),aes(x = ind, y = values) ) + geom_boxplot()
+boxplot(EDAD_conti$pdays, main ='Box plot for pdays')
+
+# Pdays is number of days passed after client was last contacted from previous campaign.
+# Value of 999 means the client was not contacted. This values is sticking out as an outlier. Hence recoding the value to -1
+EDAD_conti$pdays <- as.integer(revalue(as.character(EDAD_conti$pdays), c("999" = "-1")))
+boxplot(EDAD_conti$pdays, main ='Box plot for pdays')
+
+boxplot(EDAD_conti$duration)
+
+# ScatterPlot
+pairs(EDAD_conti, pch=19)
+
+# Computing the p value of correlations
+cor.mtest <- function(mat, ...) {
+    mat <- as.matrix(mat)
+    n <- ncol(mat)
+    p.mat<- matrix(NA, n, n)
+    diag(p.mat) <- 0
+    for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+            tmp <- cor.test(mat[, i], mat[, j], ...)
+            p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
+        }
+    }
+  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+  p.mat
+}
+p.mat <- cor.mtest(EDAD_conti)
+correlation <- cor(EDAD_conti)
+# Correlation plot with significance level of 0.05
+corrplot(correlation, type="upper", order="hclust", main = "Correlation Matrix", p.mat = p.mat, sig.level = 0.05)
+
+
+cat_cor <- GKtauDataframe(EDAD_categ)
+plot(cat_cor, corrColors = "blue", type="upper")
+
+# Heat map to find correlation
+heatmap.2(correlation,col=redgreen(75), 
+          density.info="none", trace="none", dendrogram=c("row"), 
+          symm=F,symkey=T,symbreaks=T, scale="none")
+
+
+ggscatter(EDAD_conti, x = "pdays", y = "previous", 
+          title = "Correlation Matrix",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Pdays", ylab = "Previous Contacts")
+
+
+attach(EDAD)
+summary(EDAD)
+str(EDAD)
+
+```
+
+## EDA PCA
+```{r EDA- PCA}
+pc.result<-prcomp(EDAD_conti,scale.=TRUE)
+pc.result
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-EDAD$y
+
+# variance
+pr_var <- (pc.result$sdev)^2
+# % of variance explained
+prop_varex <- pr_var/sum(pr_var)
+# show percentage of variance of each component
+plot(prop_varex, xlab = "Principal Component", ylab = "Proportion of Variance Explained", type = "b" )
+# Scree Plot
+plot(cumsum(prop_varex), xlab = "Principal Component", ylab = "Cumulative Proportion of Variance Explained", type = "b" )
+# first 6 components are responsible for around 90% of variance
+cumsum(prop_varex)
+# This result means that the majority of information contained in 11 numeric variables can be reduced to 6 principal components.
+
+ggplot(data = pc.scores, aes(x = PC4, y = PC5)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Auto")
+
 ```
 
 ## Normalization Techniques - EDA
