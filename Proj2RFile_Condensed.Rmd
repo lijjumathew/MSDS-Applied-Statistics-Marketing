@@ -7,6 +7,8 @@ editor_options:
 
 ## Load libraries
 ```{r}
+library(MASS)
+library(ResourceSelection)
 library(GGally)
 library(scales)
 library(formattable)
@@ -135,7 +137,7 @@ imputed$poutcome <- as.numeric(imputed$poutcome)
 imputed$day_of_week <- as.numeric(imputed$day_of_week)
 
 EDAD <- imputed
-
+summary(EDAD)
 EDAD_conti <- datain[, !sapply(datain, is.factor)]
 EDAD_categ <- datain[, sapply(datain, is.factor)]
 ```
@@ -476,6 +478,12 @@ obj1.mod.acc <- 0.8072
 obj1.mod.sens <- 0.8373
 obj1.mod.spec <- 0.5704
 
+# Goodness of fit test
+hl <- hoslem.test(red.mod7.log$y, fitted(red.mod7.log ), g=10)
+hl
+conf.step<-table(class.step,logit.os.Test$y)
+chisq.test(conf.step)
+
 #MisCalc Rates
 misClasificError <- mean(class.step != logit.os.Test$y)
 print("Miscalculation Rate")
@@ -495,6 +503,8 @@ auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
 plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+
+
 ```
 
 ## Logit - Reduced Model 1(job,month,campaign,pdays,poutcome,emp.var.rate,cons.price.idx) 
@@ -541,6 +551,15 @@ auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
 plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+
+library(ResourceSelection)
+hl <- hoslem.test(red.mod7.log$y, fitted(red.mod7.log ), g=10)
+hl
+
+library(MASS)
+conf.step<-table(class.step,logit.os.Test$y)
+chisq.test(conf.step)
+
 ```
 
 ## Logit - Reduced Model 2(age,job,contact,day_of_week,campaign,pdays,poutcome,emp.var.rate,nr.employed)
