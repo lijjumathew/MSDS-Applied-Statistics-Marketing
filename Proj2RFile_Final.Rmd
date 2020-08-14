@@ -5,8 +5,13 @@ editor_options:
   chunk_output_type: console
 ---
 
+# Please see the below code and comments for Applied Stats Project 2, Dr. Turner, SMU
+# Authors: Antonio Debouse, Paul Huggins, Lijju Matthew
+# Thank you!
+
 ## Load libraries
 ```{r}
+# Below are the required libraries for the project
 library(GGally)
 library(scales)
 library(formattable)
@@ -53,6 +58,8 @@ library(pls)
 library(bestNormalize)
 library(ResourceSelection)
 library(ROCR)
+library(gplots)
+library(ggpubr)
 ```
 ## Load in dataset and look at data
 ```{r}
@@ -167,13 +174,9 @@ MASS::truehist(EDAD$cons.conf.idx)
 MASS::truehist(EDAD$euribor3m)
 MASS::truehist(EDAD$nr.employed)
 
-# Correlation to y variable
-x <- EDAD %>% correlate() %>% focus(y)
-x
 ```
 ## EDA Box plots, Scatter plots, Correlation plots
-```{r EDA - Box plots, Scatter plots, Correlation plots}
-
+```{r}
 
 # Box plots to find outliers
 EDAD_conti <- dplyr::select(EDAD_conti, -11)
@@ -181,48 +184,32 @@ boxplot(EDAD_conti, main ='Box plot - all variables')
 ggplot(stack(EDAD_conti),aes(x = ind, y = values) ) + geom_boxplot()
 boxplot(EDAD_conti$pdays, main ='Box plot for pdays')
 
-# Pdays is number of days passed after client was last contacted from previous campaign.
-# Value of 999 means the client was not contacted. This values is sticking out as an outlier. Hence recoding the value to -1
-EDAD_conti$pdays <- as.integer(revalue(as.character(EDAD_conti$pdays), c("999" = "-1")))
-boxplot(EDAD_conti$pdays, main ='Box plot for pdays')
-
-boxplot(EDAD_conti$duration)
-
 # ScatterPlot
 pairs(EDAD_conti, pch=19)
 
-# Computing the p value of correlations
-#cor.mtest <- function(mat, ...) {
-#    mat <- as.matrix(mat)
-#    n <- ncol(mat)
-#    p.mat<- matrix(NA, n, n)
-#    diag(p.mat) <- 0
-#    for (i in 1:(n - 1)) {
-#        for (j in (i + 1):n) {
-#            tmp <- cor.test(mat[, i], mat[, j], ...)
-#            p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
-#        }
-#    }
-#  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
-#  p.mat
-#}
-#p.mat <- cor.mtest(EDAD)
-#correlation <- cor(EDAD)
+#Computing the p value of correlations
+cor.mtest <- function(mat, ...) {
+    mat <- as.matrix(mat)
+    n <- ncol(mat)
+    p.mat<- matrix(NA, n, n)
+    diag(p.mat) <- 0
+    for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+            tmp <- cor.test(mat[, i], mat[, j], ...)
+            p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
+        }
+    }
+  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+  p.mat
+}
+p.mat <- cor.mtest(EDAD)
+correlation <- cor(EDAD)
 
 # correlation
 cor.data <- EDAD
 cor.data$y <- as.numeric(as.factor(cor.data$y))
 cor(cor.data[-21], cor.data$y) 
 
-# Correlation plot with significance level of 0.05
-#corrplot(correlation, type="upper", order="hclust", main = "Correlation Matrix", p.mat = p.mat, sig.level = 0.05)
-
-
-#cat_cor <- GKtauDataframe(EDAD_categ)
-p#lot(cat_cor, corrColors = "blue", type="upper")
-
-library(gplots)
-library(ggpubr)
 # Heat map to find correlation
 heatmap.2(correlation,col=redgreen(75), 
           density.info="none", trace="none", dendrogram=c("row"), 
@@ -234,15 +221,9 @@ ggscatter(EDAD_conti, x = "pdays", y = "previous",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson",
           xlab = "Pdays", ylab = "Previous Contacts")
-
-
-#attach(EDAD)
-#summary(EDAD)
-#str(EDAD)
-
 ```
 ## EDA PCA
-```{r EDA- PCA}
+```{r}
 pc.result<-prcomp(EDAD_conti,scale.=TRUE)
 pc.result
 pc.scores<-pc.result$x
@@ -265,6 +246,30 @@ ggplot(data = pc.scores, aes(x = PC4, y = PC5)) +
   geom_point(aes(col=y), size=1)+
   ggtitle("PCA of Auto")
 
+```
+## BestNormalize on Continious variables
+```{r}
+# The bestnormalize function provides a detailed output describing if/what transformation cna be done to improve the models
+bn.age <- bestNormalize(imputed$age)
+bn.campaign <- bestNormalize(imputed$campaign)
+bn.pdays <- bestNormalize(imputed$pdays)
+bn.previous <- bestNormalize(imputed$previous)
+bn.emp.var.rate <- bestNormalize(imputed$emp.var.rate)
+bn.cons.price.idx <- bestNormalize(imputed$cons.price.idx)   
+bn.cons.conf.idx <- bestNormalize(imputed$cons.conf.idx)    
+bn.euribor3m <- bestNormalize(imputed$euribor3m)
+bn.nr.employed <- bestNormalize(imputed$nr.employed)
+
+# See results
+bn.age # transform necessary
+bn.campaign # transform necessary
+bn.pdays # transform necessary
+bn.previous # transform necessary
+bn.emp.var.rate # could possibly take sqrt for minor improvement
+bn.cons.price.idx # transform necessary
+bn.cons.conf.idx # transform necessary
+bn.euribor3m # could possibly take box-cox for minor improvement
+bn.nr.employed # transform necessary
 ```
 ## Summary Table for Continious Varaibles
 ```{r}
@@ -426,221 +431,299 @@ summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod6.log <- glm(y ~ job + education  +  campaign  + poutcome + nr.employed , family="binomial",data=logit.os.Train)
-# Step Model
-step.os.log <- red.mod6.log %>% stepAIC(trace=FALSE)
-# Model Summary
-summary(step.os.log)
-# Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
-# VIF Scores
-vif(step.os.log)
-# Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
-cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-print("Confusion matrix for Stepwise")
-obj1.mod.cm <- confusionMatrix(as.factor(class.step), logit.os.Test$y)
 
-obj1.mod.acc <- obj1.mod.cm$overall["Accuracy"]
-obj1.mod.acc
-obj1.mod.sens <- obj1.mod.cm$byClass["Sensitivity"]
-obj1.mod.sens
-obj1.mod.spec <- obj1.mod.cm$byClass["Specificity"]
-obj1.mod.spec
+# Step Model
+step.os6.log <- red.mod6.log %>% stepAIC(trace=FALSE)
+
+# Model Summary
+summary(step.os6.log)
+
+# Error Metrics
+step.os6.aic <- step.os.log$aic
+step.os6.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os6.log), confint.default(step.os6.log, level = 0.95)))
+
+# VIF Scores
+vif.6 <- vif(step.os6.log)
+vif.6.max <- max(vif.6)
+vif.6
+vif.6.max
+
+# Predictions & Accuracy
+fit.pred6.step<-predict(step.os6.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step6<-factor(ifelse(fit.pred6.step>cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+obj1.mod6.cm <- confusionMatrix(as.factor(class.step6), logit.os.Test$y)
+
+obj1.mod6.acc <- obj1.mod6.cm$overall["Accuracy"]
+obj1.mod6.acc
+obj1.mod6.sens <- obj1.mod6.cm$byClass["Sensitivity"]
+obj1.mod6.sens
+obj1.mod6.spec <- obj1.mod6.cm$byClass["Specificity"]
+obj1.mod6.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+obj1.mod6.msclc <- mean(class.step6 != logit.os.Test$y)
 print("Miscalculation Rate")
-misClasificError
+obj1.mod6.msclc
 
 # Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
+p.6 <- predict(step.os6.log, newdata=logit.os.Test, type="response")
+pr.6 <- prediction(p.6, logit.os.Test$y)
 # TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+prf.6 <- performance(pr.6, measure = "tpr", x.measure = "fpr")
+auc.6 <- performance(pr.6, measure = "auc")
+auc.6 <- auc.6@y.values[[1]]
+auc.6
+plot(prf.6, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 1(job,month,campaign,pdays,poutcome,emp.var.rate,cons.price.idx) 
 ## Accuracy - 81.1%, Sensitivity - 84.9, Specificity - 50.9, MC - 0.1886, AUC - 0.7206
 ```{r reduced model 1}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
 attach(logit.os.Train)
+
 # Build Full Model
 red.mod1.log <- glm(y~ job + month + campaign + pdays + poutcome + emp.var.rate + cons.price.idx ,family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod1.log %>% stepAIC(trace=FALSE)
+step.os1.log <- red.mod1.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os1.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os1.aic <- step.os1.log$aic
+step.os1.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os1.log), confint.default(step.os1.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.1 <- vif(step.os1.log)
+vif.1.max <- max(vif.1)
+vif.1
+vif.1.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test, type="response")
+fit.pred1.step<-predict(step.os1.log,newdata=logit.os.Test, type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-confusionMatrix(as.factor(class.step),logit.os.Test$y)
+class.1step<-factor(ifelse(fit.pred1.step>cutoff,"yes","no"))
+obj1.mod1.cm <- confusionMatrix(as.factor(class.1step), logit.os.Test$y)
+
+obj1.mod1.acc <- obj1.mod1.cm$overall["Accuracy"]
+obj1.mod1.acc
+obj1.mod1.sens <- obj1.mod1.cm$byClass["Sensitivity"]
+obj1.mod1.sens
+obj1.mod1.spec <- obj1.mod1.cm$byClass["Specificity"]
+obj1.mod1.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+obj1.mod1.msclc <- mean(class.1step != logit.os.Test$y)
 print("Miscalculation Rate")
-misClasificError
+obj1.mod1.msclc
 
 # Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
+p1 <- predict(step.os1.log, newdata=logit.os.Test, type="response")
+pr1 <- prediction(p1, logit.os.Test$y)
 # TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+prf1 <- performance(pr1, measure = "tpr", x.measure = "fpr")
+auc1 <- performance(pr1, measure = "auc")
+auc1 <- auc1@y.values[[1]]
+auc1
+plot(prf1, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 2(age,job,contact,day_of_week,campaign,pdays,poutcome,emp.var.rate,nr.employed)
 ## Accuracy - 79.3%, Sensitivity - 85.3, Specificity - 43.5, MC - 0.2068, AUC - 0.7012
 ```{r reduced model 2}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod2.log <- glm(y ~ age + job + contact + day_of_week + campaign + pdays + poutcome + emp.var.rate + nr.employed , family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod2.log %>% stepAIC(trace=FALSE)
+step.os2.log <- red.mod2.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os2.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os2.aic <- step.os2.log$aic
+step.os2.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os2.log), confint.default(step.os2.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.2 <- vif(step.os2.log)
+vif.2.max <- max(vif.2)
+vif.2
+vif.2.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step2<-predict(step.os2.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-confusionMatrix(as.factor(class.step),logit.os.Test$y)
+class.step2<-factor(ifelse(fit.pred.step2>cutoff,"yes","no"))
+obj1.mod2.cm <- confusionMatrix(as.factor(class.step2), logit.os.Test$y)
+
+obj1.mod2.acc <- obj1.mod2.cm$overall["Accuracy"]
+obj1.mod2.acc
+obj1.mod2.sens <- obj1.mod2.cm$byClass["Sensitivity"]
+obj1.mod2.sens
+obj1.mod2.spec <- obj1.mod2.cm$byClass["Specificity"]
+obj1.mod2.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+obj1.mod2.msclc <- mean(class.step2 != logit.os.Test$y)
 print("Miscalculation Rate")
-misClasificError
+obj1.mod2.msclc
 
 # Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
+p2 <- predict(step.os2.log, newdata=logit.os.Test, type="response")
+pr2 <- prediction(p2, logit.os.Test$y)
 # TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+prf2 <- performance(pr2, measure = "tpr", x.measure = "fpr")
+auc2 <- performance(pr2, measure = "auc")
+auc2 <- auc2@y.values[[1]]
+auc2
+plot(prf2, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 4(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m)
 ## Accuracy - 80.5%, Sensitivity - 85.4, Specificity - 42.0, MC - 0.1947, AUC - 0.6911
 ```{r reduced model 4}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod4.log <- glm(y ~ job + contact + day_of_week + campaign + pdays + poutcome + euribor3m , family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod4.log %>% stepAIC(trace=FALSE)
+step.os4.log <- red.mod4.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os4.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os4.aic <- step.os4.log$aic
+step.os4.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os4.log), confint.default(step.os4.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.4 <- vif(step.os4.log)
+vif.4.max <- max(vif.4)
+vif.4
+vif.4.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step4<-predict(step.os4.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-confusionMatrix(as.factor(class.step),logit.os.Test$y)
+class.step4<-factor(ifelse(fit.pred.step4>cutoff,"yes","no"))
+obj1.mod4.cm <- confusionMatrix(as.factor(class.step2), logit.os.Test$y)
+
+obj1.mod4.acc <- obj1.mod4.cm$overall["Accuracy"]
+obj1.mod4.acc
+obj1.mod4.sens <- obj1.mod4.cm$byClass["Sensitivity"]
+obj1.mod4.sens
+obj1.mod4.spec <- obj1.mod4.cm$byClass["Specificity"]
+obj1.mod4.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+obj1.mod4.msclc <- mean(class.step4 != logit.os.Test$y)
 print("Miscalculation Rate")
-misClasificError
+obj1.mod4.msclc
 
 # Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
+p4 <- predict(step.os4.log, newdata=logit.os.Test, type="response")
+pr4 <- prediction(p4, logit.os.Test$y)
 # TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+prf4 <- performance(pr4, measure = "tpr", x.measure = "fpr")
+auc4 <- performance(pr4, measure = "auc")
+auc4 <- auc4@y.values[[1]]
+auc4
+plot(prf4, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 7(job,education,campaign,pdays,poutcome,nr.employed, emp.var.rate)
 ## Accuracy - 84.2%, Sensitivity - 89.4, Specificity - 44.1, MC - 0.1573, AUC - 0.7119
 ```{r reduced model 7}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod7.log <- glm(y ~ job + education + campaign + pdays + poutcome + nr.employed + emp.var.rate, family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
+step.os7.log <- red.mod7.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os7.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os7.aic <- step.os7.log$aic
+step.os7.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os7.log), confint.default(step.os7.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.7 <- vif(step.os7.log)
+vif.7.max <- max(vif.7)
+vif.7
+vif.7.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step7<-predict(step.os7.log,newdata=logit.os.Test,type="response")
 cutoff <- 0.5
-class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
+class.step7 <- factor(ifelse(fit.pred.step7 > cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
-confusionMatrix(as.factor(class.step), logit.os.Test$y)
+obj1.mod7.cm <- confusionMatrix(as.factor(class.step2), logit.os.Test$y)
+
+obj1.mod7.acc <- obj1.mod7.cm$overall["Accuracy"]
+obj1.mod7.acc
+obj1.mod7.sens <- obj1.mod7.cm$byClass["Sensitivity"]
+obj1.mod7.sens
+obj1.mod7.spec <- obj1.mod7.cm$byClass["Specificity"]
+obj1.mod7.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+obj1.mod7.msclc <- mean(class.step7 != logit.os.Test$y)
 print("Miscalculation Rate")
-misClasificError
+obj1.mod7.mscl
 
 # Roc Curves & value
-p <- predict(step.os.log, newdata=logit.os.Test, type="response")
-pr <- prediction(p, logit.os.Test$y)
+p7 <- predict(step.os7.log, newdata=logit.os.Test, type="response")
+pr7 <- prediction(p7, logit.os.Test$y)
 # TPR = sensitivity, FPR=specificity
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+prf7 <- performance(pr7, measure = "tpr", x.measure = "fpr")
+auc7 <- performance(pr7, measure = "auc")
+auc7 <- auc7@y.values[[1]]
+auc7
+plot(prf7, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 3(job,contact,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
 ## Accuracy - 79.99%, Sensitivity - 84.3, Specificity - 45.7, VIF ISSUES!
@@ -651,24 +734,56 @@ summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod3.log <- glm(y ~ job + contact + day_of_week + campaign + pdays + poutcome + euribor3m + nr.employed , family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod3.log %>% stepAIC(trace=FALSE)
+step.os3.log <- red.mod3.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os3.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os3.aic <- step.os3.log$aic
+step.os3.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os3.log), confint.default(step.os3.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.3 <- vif(step.os3.log)
+vif.3.max <- max(vif.3)
+vif.3
+vif.3.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step3<-predict(step.os3.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-confusionMatrix(as.factor(class.step),logit.os.Test$y)
+class.step3<-factor(ifelse(fit.pred.step3>cutoff,"yes","no"))
+obj1.mod3.cm <- confusionMatrix(as.factor(class.step3), logit.os.Test$y)
+
+obj1.mod3.acc <- obj1.mod3.cm$overall["Accuracy"]
+obj1.mod3.acc
+obj1.mod3.sens <- obj1.mod3.cm$byClass["Sensitivity"]
+obj1.mod3.sens
+obj1.mod3.spec <- obj1.mod3.cm$byClass["Specificity"]
+obj1.mod3.spec
+
+#MisCalc Rates
+obj1.mod3.msclc <- mean(class.step3 != logit.os.Test$y)
+print("Miscalculation Rate")
+obj1.mod3.mscl
+
+# Roc Curves & value
+p3 <- predict(step.os3.log, newdata=logit.os.Test, type="response")
+pr3 <- prediction(p3, logit.os.Test$y)
+# TPR = sensitivity, FPR=specificity
+prf3 <- performance(pr3, measure = "tpr", x.measure = "fpr")
+auc3 <- performance(pr3, measure = "auc")
+auc3 <- auc3@y.values[[1]]
+auc3
+plot(prf3, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 ## Logit - Reduced Model 5(job,contact,education,day_of_week,campaign,pdays,poutcome,euribor3m,nr.employed)
 ## Accuracy - 80.1%, Sensitivity - 84.5, Specificity - 45.1, VIF ISSUES!
@@ -679,37 +794,111 @@ summary(logit.os.Train)
 str(logit.os.Train)
 logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
 # Build Full Model
 red.mod5.log <- glm(y ~ job + education + contact + day_of_week + campaign + pdays + poutcome + euribor3m + nr.employed , family="binomial",data=logit.os.Train)
+
 # Step Model
-step.os.log <- red.mod5.log %>% stepAIC(trace=FALSE)
+step.os5.log <- red.mod5.log %>% stepAIC(trace=FALSE)
+
 # Model Summary
-summary(step.os.log)
+summary(step.os5.log)
+
 # Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
+step.os5.aic <- step.os5.log$aic
+step.os5.aic
+
 # Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
+exp(cbind("Odds ratio" = coef(step.os5.log), confint.default(step.os5.log, level = 0.95)))
+
 # VIF Scores
-vif(step.os.log)
+vif.5 <- vif(step.os5.log)
+vif.5.max <- max(vif.5)
+vif.5
+vif.5.max
+
 # Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
+fit.pred.step5<-predict(step.os5.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
-class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
-confusionMatrix(as.factor(class.step),logit.os.Test$y)
+class.step5<-factor(ifelse(fit.pred.step5>cutoff,"yes","no"))
+obj1.mod5.cm <- confusionMatrix(as.factor(class.step5), logit.os.Test$y)
+
+obj1.mod5.acc <- obj1.mod5.cm$overall["Accuracy"]
+obj1.mod5.acc
+obj1.mod5.sens <- obj1.mod5.cm$byClass["Sensitivity"]
+obj1.mod5.sens
+obj1.mod5.spec <- obj1.mod5.cm$byClass["Specificity"]
+obj1.mod5.spec
+
+#MisCalc Rates
+obj1.mod5.msclc <- mean(class.step5 != logit.os.Test$y)
+print("Miscalculation Rate")
+obj1.mod5.mscl
+
+# Roc Curves & value
+p5 <- predict(step.os5.log, newdata=logit.os.Test, type="response")
+pr5 <- prediction(p5, logit.os.Test$y)
+# TPR = sensitivity, FPR=specificity
+prf5 <- performance(pr5, measure = "tpr", x.measure = "fpr")
+auc5 <- performance(pr5, measure = "auc")
+auc5 <- auc5@y.values[[1]]
+auc5
+plot(prf5, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
+# Objective 1 results table
+```{r}
+step.os6.res <- cbind("Model 6",obj1.mod6.acc, obj1.mod6.sens, obj1.mod6.spec, vif.6.max, obj1.mod6.msclc, auc.6)
+step.os1.res <- cbind("Model 1",obj1.mod1.acc, obj1.mod1.sens, obj1.mod1.spec, vif.1.max, obj1.mod1.msclc, auc1)
+step.os2.res <- cbind("Model 2",obj1.mod2.acc, obj1.mod2.sens, obj1.mod2.spec, vif.2.max, obj1.mod2.msclc, auc2)
+step.os4.res <- cbind("Model 4",obj1.mod4.acc, obj1.mod4.sens, obj1.mod4.spec, vif.4.max, obj1.mod4.msclc, auc4)
+step.os7.res <- cbind("Model 7",obj1.mod7.acc, obj1.mod7.sens, obj1.mod7.spec, vif.7.max, obj1.mod7.msclc, auc7)
+step.os3.res <- cbind("Model 3",obj1.mod3.acc, obj1.mod3.sens, obj1.mod3.spec, vif.3.max, obj1.mod3.msclc, auc3)
+step.os5.res <- cbind("Model 5",obj1.mod5.acc, obj1.mod5.sens, obj1.mod5.spec, vif.5.max, obj1.mod5.msclc, auc5)
+
+
+accuracy1 <- rbind(step.os6.res, step.os1.res, step.os2.res, step.os4.res, step.os7.res, step.os3.res, step.os5.res)
+
+colnames(accuracy1) <- c("Method", "Accuracy", "Sensitivity", "Specificity", "LargestVIF" , "MiscalcRate", "AUCROC")
+
+accuracytbl1 <- as.data.frame(accuracy1)
+accuracytbl1$Accuracy <- as.numeric(accuracytbl1$Accuracy)
+accuracytbl1$Sensitivity <- as.numeric(accuracytbl1$Sensitivity)
+accuracytbl1$Specificity <- as.numeric(accuracytbl1$Specificity)
+accuracytbl1$LargestVIF <- as.numeric(accuracytbl1$LargestVIF)
+accuracytbl1$MiscalcRate <- as.numeric(accuracytbl1$MiscalcRate)
+accuracytbl1$AUCROC <- as.numeric(accuracytbl1$AUCROC)
+
+
+# Neat table
+customGreen = "#009900"
+customRed = "#ff7f7f"
+
+options(digits = 3)
+as.datatable(formattable(accuracytbl1,align = c("l",rep("r", NCOL(accuracytbl1) - 1)),
+            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
+                 'Accuracy' = color_text(customRed, customGreen),
+                 'Sensitivity' = color_text(customRed, customGreen),
+                 "Specificity" = color_text(customRed, customGreen),
+                 'MiscalcRate' = color_text(customGreen, customRed),
+                 'LargestVIF' = color_text(customGreen, customRed),
+                 "AUCROC" = color_text(customRed, customGreen)))
+)
+```
+# Model 6 is the best model given the specifity value
+
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-# Objective 2
+# Objective 2 - LDA/QDA & Other Models to build on Objective 1 Model
 
-## ANOVA
+## ANOVA for obj 1 models
 ```{r}
 # Anova Table
 res.aov2 <- aov(as.numeric(y) ~ job + education + campaign + poutcome + nr.employed, data = imputed)
 summary(res.aov2)
+# There is a significant differnece in means
 ```
 
 ## Logit Round 2 - Interactive Model (job,education,campaign,poutcome,nr.employed)
@@ -735,33 +924,38 @@ red.mod7.log <- glm(y ~ job + education + campaign + poutcome +
                       education*nr.employed + education*poutcome + poutcome*nr.employed, family="binomial", data=logit.os.Train)
 
 # Step Model
-step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
-# Model Summary
-summary(step.os.log)
-# Error Metrics
-step.os.aic <- step.os.log$aic
-step.os.aic
-# Confidence Intervals
-exp(cbind("Odds ratio" = coef(step.os.log), confint.default(step.os.log, level = 0.95)))
-# VIF Scores
-vif(step.os.log)
-# Predictions & Accuracy
-fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
-cutoff <- 0.5
-class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
-print("Confusion matrix for Stepwise")
-obj1.mod2.cm <- confusionMatrix(as.factor(class.step), logit.os.Test$y)
-obj1.mod2.cm
+step.osj2.log <- red.mod7.log %>% stepAIC(trace=FALSE)
 
-obj1.mod2.acc <- obj1.mod2.cm$overall["Accuracy"]
-obj1.mod2.acc
-obj1.mod2.sens <- obj1.mod2.cm$byClass["Sensitivity"]
-obj1.mod2.sens
-obj1.mod2.spec <- obj1.mod2.cm$byClass["Specificity"]
-obj1.mod2.spec
+# Model Summary
+summary(step.osj2.log)
+
+# Error Metrics
+step.osj2.aic <- step.osj2.log$aic
+step.osj2.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.osj2.log), confint.default(step.osj2.log, level = 0.95)))
+
+# VIF Scores
+vif.osj2 <- vif(step.osj2.)
+
+# Predictions & Accuracy
+fit.pred.step.oj2 <-predict(step.osj2.log,newdata=logit.os.Test,type="response")
+cutoff <- 0.5
+class.step.oj2 <- factor(ifelse(fit.pred.step.oj2 > cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+obj1.modoj2.cm <- confusionMatrix(as.factor(class.step.oj2), logit.os.Test$y)
+obj1.modoj2.cm
+
+obj1.modoj2.acc <- obj1.modoj2.cm$overall["Accuracy"]
+obj1.modoj2.acc
+obj1.modoj2.sens <- obj1.modoj2.cm$byClass["Sensitivity"]
+obj1.modoj2.sens
+obj1.modoj2.spec <- obj1.modoj2.cm$byClass["Specificity"]
+obj1.modoj2.spec
 
 #MisCalc Rates
-misClasificError <- mean(class.step != logit.os.Test$y)
+misClasificError <- mean(class.step.oj2 != logit.os.Test$y)
 print("Miscalculation Rate")
 misClasificError
 
@@ -777,8 +971,9 @@ plot(prf, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 
 # Leverage plots
 par(mfrow=c(2,2))
-plot(step.os.log)
+plot(step.osj2.log)
 ```
+## This model gains some specificity over the original model due to the interaction terms added
 
 # --------------------------------------------------------
 
@@ -821,10 +1016,10 @@ l.BalanceIndex <- createDataPartition(lda.qda.data$y, p = .7,
                                   list = FALSE,
                                   times = 1)
 #Seperate all 4640 "yes" in dataset
-lY_data <- filter(lda.qda.data,grepl("yes",y))
+lY_data <- filter(lda.qda.data,grepl("2",y))
 
 #Seperate all "no's" in dataset
-lN_data <- filter(lda.qda.data,grepl("no", y))
+lN_data <- filter(lda.qda.data,grepl("1", y))
 
 #random sample 4640 no's from no-only dataset
 lN_data <- lN_data[sample(nrow(lN_data),4640),]
@@ -861,10 +1056,10 @@ BalanceIndex <- createDataPartition(obj2.data$y, p = .7,
                                   list = FALSE,
                                   times = 1)
 #Seperate all 4640 "yes" in dataset
-Y_data <-filter(obj2.data,grepl("yes",y))
+Y_data <- filter(obj2.data,grepl("2",y))
 
 #Seperate all "no's" in dataset
-N_data <- filter(obj2.data,grepl("no",y))
+N_data <- filter(obj2.data,grepl("1",y))
 
 #random sample 4640 no's from no-only dataset
 N_data <- N_data[sample(nrow(N_data),4640),]
@@ -1293,96 +1488,6 @@ fda.r.spec
 
 # --------------------------------------------------------
 
-## RDA with original
-## Accuracy - 89.6%, Sensitivity - 98.6%, Specificity - 20.1%
-```{r}
-set.seed(123)
-
-# Fit the model
-rda.o.model <- rda(y ~ ., data = orig.train)
-
-# Make predictions
-rda.o.predictions <- rda.o.model %>% predict(orig.test)
-
-# Error
-rda.o.error <- mean(orig.test$y != rda.o.predictions$class)
-rda.o.error
-
-# Confusion Matrix
-rda.o.cm <- caret::confusionMatrix(rda.o.predictions$class, as.factor(orig.test$y))
-rda.o.cm
-
-# Model accuracy
-rda.o.acc <- rda.o.cm$overall["Accuracy"]
-rda.o.acc
-
-# Sensitivity and Specificity
-rda.o.sens <- rda.o.cm$byClass["Sensitivity"]
-rda.o.sens
-rda.o.spec <- rda.o.cm$byClass["Specificity"]
-rda.o.spec
-```
-## RDA with balanced
-## Accuracy - 82.2%, Sensitivity - 86.1%, Specificity - 51.9%
-```{r}
-set.seed(123)
-
-# Fit the model
-rda.b.model <- rda(y ~ ., data = balanced.train)
-
-# Make predictions
-rda.b.predictions <- rda.b.model %>% predict(balanced.test)
-
-# Error
-rda.b.error <- mean(balanced.test$y != rda.b.predictions$class)
-rda.b.error
-
-# Confusion Matrix
-rda.b.cm <- caret::confusionMatrix(rda.b.predictions$class, as.factor(balanced.test$y))
-rda.b.cm
-
-# Model accuracy
-rda.b.acc <- rda.b.cm$overall["Accuracy"]
-rda.b.acc
-
-# Sensitivity and Specificity
-rda.b.sens <- rda.b.cm$byClass["Sensitivity"]
-rda.b.sens
-rda.b.spec <- rda.b.cm$byClass["Specificity"]
-rda.b.spec
-```
-## RDA with rose
-## Accuracy - 87.7%, Sensitivity - 94.6%, Specificity - 35.4%
-```{r}
-set.seed(123)
-
-# Fit the model
-rda.r.model <- rda(y ~ ., data = rose.train)
-
-# Make predictions
-rda.r.predictions <- rda.r.model %>% predict(rose.test)
-
-# Error
-rda.r.error <- mean(rose.test$y != rda.r.predictions$class)
-rda.r.error
-
-# Confusion Matrix
-rda.r.cm <- caret::confusionMatrix(rda.r.predictions$class, as.factor(rose.test$y))
-rda.r.cm
-
-# Model accuracy
-rda.r.acc <- rda.r.cm$overall["Accuracy"]
-rda.r.acc
-
-# Sensitivity and Specificity
-rda.r.sens <- rda.r.cm$byClass["Sensitivity"]
-rda.r.sens
-rda.r.spec <- rda.r.cm$byClass["Specificity"]
-rda.r.spec
-```
-
-# --------------------------------------------------------
-
 ## RF with original
 ## Accuracy - 89.6%, Sensitivity - 98.7%, Specificity - 19.3%
 ```{r}
@@ -1671,7 +1776,7 @@ fit.o.pred.lasso <- round(fit.o.pred.lasso)
 
 #Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.
 cutoff<-0.5
-class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"yes","no"))
+class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"2","1"))
 
 # Error
 lasso.o.error <- mean(lasso.o.test.data$y != class.o.lasso)
@@ -1723,7 +1828,7 @@ fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response
 
 #Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models
 cutoff<-0.5
-class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"yes","no"))
+class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"2","1"))
 
 # Error
 lasso.b.error <- mean(lasso.b.test.data$y != class.b.lasso)
@@ -1775,7 +1880,7 @@ fit.r.pred.lasso <- predict(lasso.r.model, newx = dat.r.test.x, type = "response
 
 #Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  
 cutoff<-0.5
-class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"yes","no"))
+class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"2","1"))
 
 # Error
 lasso.r.error <- mean(lasso.r.test.data$y != class.r.lasso)
@@ -2028,7 +2133,7 @@ as.datatable(formattable(accuracytbl,align = c("l",rep("r", NCOL(accuracytbl) - 
                  'Accuracy' = color_text(customRed, customGreen),
                  'Sensitivity' = color_text(customRed, customGreen),
                  "Specificity" = color_text(customRed, customGreen),
-                 'Error Rate' = color_text(customRed, customGreen)))
+                 'Error Rate' = color_text(customGreen, customRed)))
 )
 ```
 
@@ -2046,9 +2151,6 @@ MDA.R.results <- cbind("MDA Rose",mda.r.acc, mda.r.sens, mda.r.spec, mda.r.error
 FDA.O.results <- cbind("FDA Original",fda.o.acc, fda.o.sens, fda.o.spec, fda.o.error)
 FDA.B.results <- cbind("FDA Balanced",fda.b.acc, fda.b.sens, fda.b.spec, fdab.error)
 FDA.R.results <- cbind("FDA Rose",fda.r.acc, fda.r.sens, fda.r.spec, fda.r.error)
-RDA.O.results <- cbind("RDA Original",rda.o.acc, rda.o.sens, rda.o.spec, rda.o.error)
-RDA.B.results <- cbind("RDA Balanced",rda.b.acc, rda.b.sens, rda.b.spec, rda.b.error)
-RDA.R.results <- cbind("RDA Rose",rda.r.acc, rda.r.sens, rda.r.spec, rda.r.error)
 RIDGE.O.results <- cbind("Ridge Original",ridge.o.acc, ridge.o.sens, ridge.o.spec, ridge.o.error)
 RIDGE.B.results <- cbind("Ridge Balanced",ridge.b.acc, ridge.b.sens, ridge.b.spec, ridge.b.error)
 RIDGE.R.results <- cbind("Ridge Rose",ridge.r.acc, ridge.r.sens, ridge.r.spec, ridge.r.error)
@@ -2066,7 +2168,6 @@ accuracy <- rbind(LDA.O.results, LDA.B.results, LDA.R.results,
                   QDA.O.results, QDA.B.results, QDA.R.results,
                   MDA.O.results, MDA.B.results, MDA.R.results,
                   FDA.O.results, FDA.B.results, FDA.R.results,
-                  RDA.O.results, RDA.B.results, RDA.R.results,
                   RIDGE.O.results, RIDGE.B.results, RIDGE.R.results,
                   LASSO.O.results, LASSO.B.results, LASSO.R.results,
                   NET.O.results, NET.B.results, NET.R.results,
@@ -2093,6 +2194,101 @@ as.datatable(formattable(accuracytbl, digits = 3,
                  'Accuracy' = color_text(customRed, customGreen),
                  'Sensitivity' = color_text(customRed, customGreen),
                  "Specificity" = color_text(customRed, customGreen),
-                 "ErrorRate" = color_text(customRed, customGreen)))
+                 "ErrorRate" = color_text(customGreen, customRed)))
 )
+```
+
+
+
+
+
+
+#EXTRA MODELS DEEMED UNNECESSARY
+
+## RDA with original
+## Accuracy - 89.6%, Sensitivity - 98.6%, Specificity - 20.1%
+```{r}
+set.seed(123)
+
+# Fit the model
+rda.o.model <- rda(y ~ ., data = orig.train)
+
+# Make predictions
+rda.o.predictions <- rda.o.model %>% predict(orig.test)
+
+# Error
+rda.o.error <- mean(orig.test$y != rda.o.predictions$class)
+rda.o.error
+
+# Confusion Matrix
+rda.o.cm <- caret::confusionMatrix(rda.o.predictions$class, as.factor(orig.test$y))
+rda.o.cm
+
+# Model accuracy
+rda.o.acc <- rda.o.cm$overall["Accuracy"]
+rda.o.acc
+
+# Sensitivity and Specificity
+rda.o.sens <- rda.o.cm$byClass["Sensitivity"]
+rda.o.sens
+rda.o.spec <- rda.o.cm$byClass["Specificity"]
+rda.o.spec
+```
+## RDA with balanced
+## Accuracy - 82.2%, Sensitivity - 86.1%, Specificity - 51.9%
+```{r}
+set.seed(123)
+
+# Fit the model
+rda.b.model <- rda(y ~ ., data = balanced.train)
+
+# Make predictions
+rda.b.predictions <- rda.b.model %>% predict(balanced.test)
+
+# Error
+rda.b.error <- mean(balanced.test$y != rda.b.predictions$class)
+rda.b.error
+
+# Confusion Matrix
+rda.b.cm <- caret::confusionMatrix(rda.b.predictions$class, as.factor(balanced.test$y))
+rda.b.cm
+
+# Model accuracy
+rda.b.acc <- rda.b.cm$overall["Accuracy"]
+rda.b.acc
+
+# Sensitivity and Specificity
+rda.b.sens <- rda.b.cm$byClass["Sensitivity"]
+rda.b.sens
+rda.b.spec <- rda.b.cm$byClass["Specificity"]
+rda.b.spec
+```
+## RDA with rose
+## Accuracy - 87.7%, Sensitivity - 94.6%, Specificity - 35.4%
+```{r}
+set.seed(123)
+
+# Fit the model
+rda.r.model <- rda(y ~ ., data = rose.train)
+
+# Make predictions
+rda.r.predictions <- rda.r.model %>% predict(rose.test)
+
+# Error
+rda.r.error <- mean(rose.test$y != rda.r.predictions$class)
+rda.r.error
+
+# Confusion Matrix
+rda.r.cm <- caret::confusionMatrix(rda.r.predictions$class, as.factor(rose.test$y))
+rda.r.cm
+
+# Model accuracy
+rda.r.acc <- rda.r.cm$overall["Accuracy"]
+rda.r.acc
+
+# Sensitivity and Specificity
+rda.r.sens <- rda.r.cm$byClass["Sensitivity"]
+rda.r.sens
+rda.r.spec <- rda.r.cm$byClass["Specificity"]
+rda.r.spec
 ```
