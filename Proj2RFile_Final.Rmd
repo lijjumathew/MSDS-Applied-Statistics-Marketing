@@ -361,11 +361,14 @@ fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
 cutoff<-0.5
 class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
-confusionMatrix(as.factor(class.step), logit.os.Test$y)
+obj1.mod.cm <- confusionMatrix(as.factor(class.step), logit.os.Test$y)
 
-obj1.mod.acc <- 0.8072
-obj1.mod.sens <- 0.8373
-obj1.mod.spec <- 0.5704
+obj1.mod.acc <- obj1.mod.cm$overall["Accuracy"]
+obj1.mod.acc
+obj1.mod.sens <- obj1.mod.cm$byClass["Sensitivity"]
+obj1.mod.sens
+obj1.mod.spec <- obj1.mod.cm$byClass["Specificity"]
+obj1.mod.spec
 
 #MisCalc Rates
 misClasificError <- mean(class.step != logit.os.Test$y)
@@ -663,11 +666,15 @@ fit.pred.step<-predict(step.os.log,newdata=logit.os.Test,type="response")
 cutoff <- 0.5
 class.step <- factor(ifelse(fit.pred.step > cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
-confusionMatrix(as.factor(class.step), logit.os.Test$y)
+obj1.mod2.cm <- confusionMatrix(as.factor(class.step), logit.os.Test$y)
+obj1.mod2.cm
 
-obj1.mod2.acc <- 0.7945
-obj1.mod2.sens <- 0.8223
-obj1.mod2.spec <- 0.5754
+obj1.mod2.acc <- obj1.mod2.cm$overall["Accuracy"]
+obj1.mod2.acc
+obj1.mod2.sens <- obj1.mod2.cm$byClass["Sensitivity"]
+obj1.mod2.sens
+obj1.mod2.spec <- obj1.mod2.cm$byClass["Specificity"]
+obj1.mod2.spec
 
 #MisCalc Rates
 misClasificError <- mean(class.step != logit.os.Test$y)
@@ -1932,4 +1939,3 @@ as.datatable(formattable(accuracytbl, digits = 3,
                  "Specificity" = color_text(customRed, customGreen)))
 )
 ```
-
