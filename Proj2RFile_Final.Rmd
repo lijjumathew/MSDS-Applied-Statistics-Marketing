@@ -266,6 +266,93 @@ ggplot(data = pc.scores, aes(x = PC4, y = PC5)) +
   ggtitle("PCA of Auto")
 
 ```
+## Summary Table for Continious Varaibles
+```{r}
+library(qwraps2)
+#Summary stats for continuous variables
+options(qwraps2_markup = "markdown")
+imputed <- as.data.frame(imputed)
+continuous_vars <- select(imputed, c(age,duration,campaign,pdays,previous,emp.var.rate,cons.price.idx,cons.conf.idx,euribor3m,nr.employed,y)) #includes y variable (response var.)
+ 
+continuous_vars <- as.data.frame(continuous_vars)
+ 
+ summary_statistics <-
+   list(
+    "Age" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(age,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(age,na_rm = FALSE),
+        "min" = ~min(age, na.rm = FALSE),
+        "max" = ~max(age, na.rm = FALSE)),
+    "Duration" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(duration,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(duration,na_rm = FALSE),
+        "min" = ~min(duration, na.rm = FALSE),
+        "max" = ~max(duration, na.rm = FALSE)),
+     "Campaign" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(campaign,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(campaign,na_rm = FALSE),
+        "min" = ~min(campaign, na.rm = FALSE),
+        "max" = ~max(campaign, na.rm = FALSE)),                
+     "Previous Days Since Contacted" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(pdays,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(pdays,na_rm = FALSE),
+        "min" = ~min(pdays, na.rm = FALSE),
+        "max" = ~max(pdays, na.rm = FALSE)),                
+      "Previous # of contacts performed campaign" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(previous,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(previous,na_rm = FALSE),
+        "min" = ~min(previous, na.rm = FALSE),
+        "max" = ~max(previous, na.rm = FALSE)),
+     "Employment Variation Rate" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(emp.var.rate,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(emp.var.rate,na_rm = FALSE),
+        "min" = ~min(emp.var.rate, na.rm = FALSE),
+        "max" = ~max(emp.var.rate, na.rm = FALSE)),
+      "Consumer Price Index" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(cons.price.idx,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(cons.price.idx,na_rm = FALSE),
+        "min" = ~min(cons.price.idx, na.rm = FALSE),
+        "max" = ~max(cons.price.idx, na.rm = FALSE)),
+      "Consumer Confidence Index" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(cons.conf.idx,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(cons.conf.idx,na_rm = FALSE),
+        "min" = ~min(cons.conf.idx, na.rm = FALSE),
+        "max" = ~max(cons.conf.idx, na.rm = FALSE)),
+      "Euribor 3-Month Rate" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(euribor3m,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(euribor3m,na_rm = FALSE),
+        "min" = ~min(euribor3m, na.rm = FALSE),
+        "max" = ~max(euribor3m, na.rm = FALSE)),
+      "Number of Employees" =
+      list(
+        "mean (sd)" = ~ qwraps2::mean_sd(nr.employed,na_rm = FALSE),
+        "median (Q1, Q3)" = ~  qwraps2::median_iqr(nr.employed,na_rm = FALSE),
+        "min" = ~min(nr.employed, na.rm = FALSE),
+        "max" = ~max(nr.employed, na.rm = FALSE))
+    )
+
+#View summary stats grouped by Yes/No
+print(qwraps2::summary_table(
+  dplyr::group_by(continuous_vars,y),
+  summary_statistics),
+rtitle = "Summary Statistics Table for Continuious Variables Grouped by Yes/No Responses")
+
+##pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
+##emp.var.rate: employment variation rate - quarterly indicator (numeric)
+##cons.price.idx: consumer price index - monthly indicator (numeric)
+##cons.conf.idx: consumer confidence index - monthly indicator (numeric)
+##euribor3m: euribor 3 month rate - daily indicator (numeric)
+##nr.employed: number of employees - quarterly indicator (numeric)
+```
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -274,11 +361,11 @@ ggplot(data = pc.scores, aes(x = PC4, y = PC5)) +
 # Objective 1 - Simple Logistic Regression
 ## Logit - Data splitting
 ```{r}
+set.seed(123)
 ## Splitting and Down Sampling
 dim(imputed)
 prop.table(table(imputed$y))
 imputed$y <- as.factor(imputed$y)
-set.seed(1234)
 training.samples <- imputed$y %>%
   createDataPartition(p = 0.7, list = FALSE)
 train <- imputed[training.samples, ]
@@ -287,11 +374,7 @@ table(train$y)
 prop.table(table(train$y))
 table(test$y)
 prop.table(table(test$y))
-# 50-50 down sampling
-train_down_s_50 <- SMOTE(form = y~.,data = train, k = 5, perc.over = 100)
-attach(train_down_s_50)
-table(train_down_s_50$y)
-prop.table(table(train_down_s_50$y))
+
 # 60-40 down sampling
 train_bal_s_60 <- SMOTE(form = y~.,data = train, k = 5, perc.over = 390)
 table(train_bal_s_60$y)
@@ -299,7 +382,7 @@ prop.table(table(train_bal_s_60$y))
 ```
 ## Logit - Full Model - SMOTE 60 - 40 Sampled
 ```{r}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
@@ -337,7 +420,7 @@ step.os.logit.acc
 ## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
 ## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.1927, AUC - 0.7387
 ```{r reduced model 6}
-set.seed(1234)
+set.seed(123)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
@@ -633,7 +716,8 @@ summary(res.aov2)
 ## Objective 1 model with added complexity
 ## Accuracy - 79.5%, Sensitivity - 82.2, Specificity - 57.5, MC - 0.20547, AUC - 0.7385
 ```{r Objective 1 complex model}
-set.seed(1234)
+set.seed(123)
+
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
@@ -646,9 +730,9 @@ lm.fit2=lm(as.numeric(y) ~ (job + education + campaign + poutcome + nr.employed)
 anova(lm.fit2)
 
 # Build Full Model
-red.mod7.log <- glm(y ~ job + education + campaign + poutcome + 
+red.mod7.log <- glm(y ~ job + education + campaign + poutcome +
                       job*education + job*campaign + education*campaign  + campaign*nr.employed + 
-                      education*nr.employed, family="binomial", data=logit.os.Train)
+                      education*nr.employed + education*poutcome + poutcome*nr.employed, family="binomial", data=logit.os.Train)
 
 # Step Model
 step.os.log <- red.mod7.log %>% stepAIC(trace=FALSE)
@@ -829,7 +913,7 @@ lda.o.predictions <- lda.o.model %>% predict(LDA.o.test.transformed)
 lda.o.predictions$class <- as.factor(lda.o.predictions$class)
 
 # Error
-lda.o.error <- mean(as.numeric(lqda.orig.test$y) != as.numeric(lda.o.predictions$class))
+lda.o.error <- mean(lqda.orig.test$y != lda.o.predictions$class)
 lda.o.error
 
 # Confusion Matrix
@@ -1462,6 +1546,10 @@ summary(ridge.o.model)
 ridge.o.pred <- round(predict(ridge.o.model, ridge.o.test))  # predict on test data
 ridge.o.compare <- cbind (actual=ridge.o.test$y, ridge.o.pred)  # combine
 
+# Error
+ridge.o.error <- mean(ridge.o.test$y != ridge.o.pred)
+ridge.o.error
+
 # Confusion Matrix
 ridge.o.cm <- caret::confusionMatrix(as.factor(ridge.o.pred), as.factor(ridge.o.test$y))
 ridge.o.cm
@@ -1493,6 +1581,10 @@ summary(ridge.b.model)
 ridge.b.pred <- round(predict(ridge.b.model, ridge.b.test))  # predict on test data
 ridge.b.compare <- cbind (actual=ridge.b.test$y, ridge.b.pred)  # combine
 
+# Error
+ridge.b.error <- mean(ridge.b.test$y != ridge.b.pred)
+ridge.b.error
+
 # Confusion Matrix
 ridge.b.cm <- caret::confusionMatrix(as.factor(ridge.b.pred), as.factor(ridge.b.test$y))
 ridge.b.cm
@@ -1523,6 +1615,10 @@ summary(ridge.r.model)
 
 ridge.r.pred <- round(predict(ridge.r.model, ridge.r.test))  # predict on test data
 ridge.r.compare <- cbind (actual=ridge.r.test$y, ridge.r.pred)  # combine
+
+# Error
+ridge.r.error <- mean(ridge.r.test$y != ridge.r.pred)
+ridge.r.error
 
 # Confusion Matrix
 ridge.r.cm <- caret::confusionMatrix(as.factor(ridge.r.pred), as.factor(ridge.r.test$y))
@@ -1577,6 +1673,10 @@ fit.o.pred.lasso <- round(fit.o.pred.lasso)
 cutoff<-0.5
 class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"yes","no"))
 
+# Error
+lasso.o.error <- mean(lasso.o.test.data$y != class.o.lasso)
+lasso.o.error
+
 # Confusion Matrix
 lasso.o.cm <- caret::confusionMatrix(as.factor(class.o.lasso), as.factor(lasso.o.test.data$y))
 lasso.o.cm
@@ -1625,6 +1725,10 @@ fit.b.pred.lasso <- predict(lasso.b.model, newx = dat.b.test.x, type = "response
 cutoff<-0.5
 class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"yes","no"))
 
+# Error
+lasso.b.error <- mean(lasso.b.test.data$y != class.b.lasso)
+lasso.b.error
+
 # Confusion Matrix
 lasso.b.cm <- caret::confusionMatrix(as.factor(class.b.lasso), as.factor(lasso.b.test.data$y))
 lasso.b.cm
@@ -1672,6 +1776,10 @@ fit.r.pred.lasso <- predict(lasso.r.model, newx = dat.r.test.x, type = "response
 #Lets use the predicted probablities to classify the observations and make a final confusion matrix for the two models.  
 cutoff<-0.5
 class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"yes","no"))
+
+# Error
+lasso.r.error <- mean(lasso.r.test.data$y != class.r.lasso)
+lasso.r.error
 
 # Confusion Matrix
 lasso.r.cm <- caret::confusionMatrix(as.factor(class.r.lasso), as.factor(lasso.r.test.data$y))
@@ -1735,6 +1843,10 @@ elastic_reg$bestTune
 # Make predictions on test set
 net.o.pred <- predict(elastic_reg, x_test)
 
+# Error
+net.o.error <- mean(net.o.test$y != net.o.pred)
+net.o.error
+
 # Confusion Matrix
 net.o.cm <- caret::confusionMatrix(net.o.pred, as.factor(y_test))
 net.o.cm
@@ -1795,6 +1907,10 @@ elastic_reg$bestTune
 # Make predictions on test set
 net.b.pred <- predict(elastic_reg, x_test)
 
+# Error
+net.b.error <- mean(net.b.test$y != net.b.pred)
+net.b.error
+
 # Confusion Matrix
 net.b.cm <- caret::confusionMatrix(net.b.pred, as.factor(y_test))
 net.b.cm
@@ -1852,9 +1968,12 @@ elastic_reg <- train(y ~ .,
 # Best tuning parameter
 elastic_reg$bestTune
 
-
 # Make predictions on test set
 net.r.pred <- predict(elastic_reg, x_test)
+
+# Error
+net.r.error <- mean(net.r.test$y != net.r.pred)
+net.r.error
 
 # Confusion Matrix
 net.r.cm <- caret::confusionMatrix(net.r.pred, as.factor(y_test))
@@ -1873,40 +1992,77 @@ net.r.spec
 
 # --------------------------------------------------------
 
-## Objective 2 Results
+## Objective 2 Results LDA/QDA
 ```{r}
-OBJ1.results <- cbind("Simple Obj 1 Model", obj1.mod.acc, obj1.mod.sens, obj1.mod.spec)
-OBJ2.results <- cbind("Complex Obj 2 Model", obj1.mod2.acc, obj1.mod2.sens, obj1.mod2.spec)
-LDA.O.results <- cbind("LDA Original",lda.o.acc, lda.o.sens, lda.o.spec)
-LDA.B.results <- cbind("LDA Balanced",lda.b.acc, lda.b.sens, lda.b.spec)
-LDA.R.results <- cbind("LDA Rose",lda.r.acc, lda.r.sens, lda.r.spec)
-QDA.O.results <- cbind("QDA Original",qda.o.acc, qda.o.sens, qda.o.spec)
-QDA.B.results <- cbind("QDA Balanced",qda.b.acc, qda.b.sens, qda.b.spec)
-QDA.R.results <- cbind("QDA Rose",qda.r.acc, qda.r.sens, qda.r.spec)
-MDA.O.results <- cbind("MDA Original",mda.o.acc, mda.o.sens, mda.o.spec)
-MDA.B.results <- cbind("MDA Balanced",mda.b.acc, mda.b.sens, mda.b.spec)
-MDA.R.results <- cbind("MDA Rose",mda.r.acc, mda.r.sens, mda.r.spec)
-FDA.O.results <- cbind("FDA Original",fda.o.acc, fda.o.sens, fda.o.spec)
-FDA.B.results <- cbind("FDA Balanced",fda.b.acc, fda.b.sens, fda.b.spec)
-FDA.R.results <- cbind("FDA Rose",fda.r.acc, fda.r.sens, fda.r.spec)
-RDA.O.results <- cbind("RDA Original",rda.o.acc, rda.o.sens, rda.o.spec)
-RDA.B.results <- cbind("RDA Balanced",rda.b.acc, rda.b.sens, rda.b.spec)
-RDA.R.results <- cbind("RDA Rose",rda.r.acc, rda.r.sens, rda.r.spec)
-RIDGE.O.results <- cbind("Ridge Original",ridge.o.acc, ridge.o.sens, ridge.o.spec)
-RIDGE.B.results <- cbind("Ridge Balanced",ridge.b.acc, ridge.b.sens, ridge.b.spec)
-RIDGE.R.results <- cbind("Ridge Rose",ridge.r.acc, ridge.r.sens, ridge.r.spec)
-LASSO.O.results <- cbind("Lasso Original",lasso.o.acc, lasso.o.sens, lasso.o.spec)
-LASSO.B.results <- cbind("Lasso Balanced",lasso.b.acc, lasso.b.sens, lasso.b.spec)
-LASSO.R.results <- cbind("Lasso Rose",lasso.r.acc, lasso.r.sens, lasso.r.spec)
-NET.O.results <- cbind("Net Original",net.o.acc, net.o.sens, net.o.spec)
-NET.B.results <- cbind("Net Balanced",net.b.acc, net.b.sens, net.b.spec)
-NET.R.results <- cbind("Net Rose",net.r.acc, net.r.sens, net.r.spec)
-RF.O.results <- cbind("RF Original",rf.o.acc, rf.o.sens, rf.o.spec)
-RF.B.results <- cbind("RF Balanced",rf.b.acc, rf.b.sens, rf.b.spec)
-RF.R.results <- cbind("RF Rose",rf.r.acc, rf.r.sens, rf.r.spec)
+LDA.O.results <- cbind("LDA Original",lda.o.acc, lda.o.sens, lda.o.spec, lda.o.error)
+LDA.B.results <- cbind("LDA Balanced",lda.b.acc, lda.b.sens, lda.b.spec, lda.b.error)
+LDA.R.results <- cbind("LDA Rose",lda.r.acc, lda.r.sens, lda.r.spec, lda.r.error)
+QDA.O.results <- cbind("QDA Original",qda.o.acc, qda.o.sens, qda.o.spec, qda.o.error)
+QDA.B.results <- cbind("QDA Balanced",qda.b.acc, qda.b.sens, qda.b.spec, qda.b.error)
+QDA.R.results <- cbind("QDA Rose",qda.r.acc, qda.r.sens, qda.r.spec, qda.r.error)
 
-accuracy <- rbind(OBJ1.results, OBJ2.results,
-                  LDA.O.results, LDA.B.results, LDA.R.results,
+
+accuracy <- rbind(LDA.O.results, LDA.B.results, LDA.R.results,
+                  QDA.O.results, QDA.B.results, QDA.R.results)
+
+colnames(accuracy) <- c("Method", "Accuracy", "Sensitivity", "Specificity", "Error Rate")
+
+accuracytbl <- as.data.frame(accuracy)
+accuracytbl$Accuracy <- as.numeric(accuracytbl$Accuracy)
+accuracytbl$Sensitivity <- as.numeric(accuracytbl$Sensitivity)
+accuracytbl$Specificity <- as.numeric(accuracytbl$Specificity)
+accuracytbl$`Error Rate` <- as.numeric(accuracytbl$`Error Rate`)
+
+
+# Neat table
+customGreen = "#009900"
+customRed = "#ff7f7f"
+
+options(digits = 3)
+as.datatable(formattable(accuracytbl,align = c("l",rep("r", NCOL(accuracytbl) - 1)),
+            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
+                 'Accuracy' = percent, 
+                 'Sensitivity' = percent,
+                 'Specificity' = percent,
+                 'Error Rate' = percent,
+                 'Accuracy' = color_text(customRed, customGreen),
+                 'Sensitivity' = color_text(customRed, customGreen),
+                 "Specificity" = color_text(customRed, customGreen),
+                 'Error Rate' = color_text(customRed, customGreen)))
+)
+```
+
+## Objective 2 Results All Tables
+```{r}
+LDA.O.results <- cbind("LDA Original",lda.o.acc, lda.o.sens, lda.o.spec, lda.o.error)
+LDA.B.results <- cbind("LDA Balanced",lda.b.acc, lda.b.sens, lda.b.spec, lda.b.error)
+LDA.R.results <- cbind("LDA Rose",lda.r.acc, lda.r.sens, lda.r.spec, lda.r.error)
+QDA.O.results <- cbind("QDA Original",qda.o.acc, qda.o.sens, qda.o.spec, qda.o.error)
+QDA.B.results <- cbind("QDA Balanced",qda.b.acc, qda.b.sens, qda.b.spec, qda.b.error)
+QDA.R.results <- cbind("QDA Rose",qda.r.acc, qda.r.sens, qda.r.spec, qda.r.error)
+MDA.O.results <- cbind("MDA Original",mda.o.acc, mda.o.sens, mda.o.spec, mda.o.error)
+MDA.B.results <- cbind("MDA Balanced",mda.b.acc, mda.b.sens, mda.b.spec, mda.b.error)
+MDA.R.results <- cbind("MDA Rose",mda.r.acc, mda.r.sens, mda.r.spec, mda.r.error)
+FDA.O.results <- cbind("FDA Original",fda.o.acc, fda.o.sens, fda.o.spec, fda.o.error)
+FDA.B.results <- cbind("FDA Balanced",fda.b.acc, fda.b.sens, fda.b.spec, fdab.error)
+FDA.R.results <- cbind("FDA Rose",fda.r.acc, fda.r.sens, fda.r.spec, fda.r.error)
+RDA.O.results <- cbind("RDA Original",rda.o.acc, rda.o.sens, rda.o.spec, rda.o.error)
+RDA.B.results <- cbind("RDA Balanced",rda.b.acc, rda.b.sens, rda.b.spec, rda.b.error)
+RDA.R.results <- cbind("RDA Rose",rda.r.acc, rda.r.sens, rda.r.spec, rda.r.error)
+RIDGE.O.results <- cbind("Ridge Original",ridge.o.acc, ridge.o.sens, ridge.o.spec, ridge.o.error)
+RIDGE.B.results <- cbind("Ridge Balanced",ridge.b.acc, ridge.b.sens, ridge.b.spec, ridge.b.error)
+RIDGE.R.results <- cbind("Ridge Rose",ridge.r.acc, ridge.r.sens, ridge.r.spec, ridge.r.error)
+LASSO.O.results <- cbind("Lasso Original",lasso.o.acc, lasso.o.sens, lasso.o.spec, lasso.o.error)
+LASSO.B.results <- cbind("Lasso Balanced",lasso.b.acc, lasso.b.sens, lasso.b.spec, lasso.b.error)
+LASSO.R.results <- cbind("Lasso Rose",lasso.r.acc, lasso.r.sens, lasso.r.spec, lasso.r.error)
+NET.O.results <- cbind("Net Original",net.o.acc, net.o.sens, net.o.spec, net.o.error)
+NET.B.results <- cbind("Net Balanced",net.b.acc, net.b.sens, net.b.spec, net.b.error)
+NET.R.results <- cbind("Net Rose",net.r.acc, net.r.sens, net.r.spec, net.r.error)
+RF.O.results <- cbind("RF Original",rf.o.acc, rf.o.sens, rf.o.spec, rf.o.error)
+RF.B.results <- cbind("RF Balanced",rf.b.acc, rf.b.sens, rf.b.spec, rf.b.error)
+RF.R.results <- cbind("RF Rose",rf.r.acc, rf.r.sens, rf.r.spec, rf.r.error)
+
+accuracy <- rbind(LDA.O.results, LDA.B.results, LDA.R.results,
                   QDA.O.results, QDA.B.results, QDA.R.results,
                   MDA.O.results, MDA.B.results, MDA.R.results,
                   FDA.O.results, FDA.B.results, FDA.R.results,
@@ -1916,13 +2072,13 @@ accuracy <- rbind(OBJ1.results, OBJ2.results,
                   NET.O.results, NET.B.results, NET.R.results,
                   RF.O.results, RF.B.results, RF.R.results)
 
-colnames(accuracy) <- c("Method", "Accuracy", "Sensitivity", "Specificity")
+colnames(accuracy) <- c("Method", "Accuracy", "Sensitivity", "Specificity", "ErrorRate")
 
 accuracytbl <- as.data.frame(accuracy)
 accuracytbl$Accuracy <- as.numeric(accuracytbl$Accuracy)
 accuracytbl$Sensitivity <- as.numeric(accuracytbl$Sensitivity)
 accuracytbl$Specificity <- as.numeric(accuracytbl$Specificity)
-
+accuracytbl$ErrorRate <- as.numeric(accuracytbl$ErrorRate)
 
 # Neat table
 customGreen = "#009900"
@@ -1936,6 +2092,7 @@ as.datatable(formattable(accuracytbl, digits = 3,
                  'Specificity' = percent,
                  'Accuracy' = color_text(customRed, customGreen),
                  'Sensitivity' = color_text(customRed, customGreen),
-                 "Specificity" = color_text(customRed, customGreen)))
+                 "Specificity" = color_text(customRed, customGreen),
+                 "ErrorRate" = color_text(customRed, customGreen)))
 )
 ```
