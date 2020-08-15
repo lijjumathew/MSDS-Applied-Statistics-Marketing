@@ -1,16 +1,16 @@
 ---
-  title: "R Notebook"
+title: "R Notebook"
 output: html_notebook
 editor_options: 
   chunk_output_type: console
 ---
+
+# Please see the below code and comments for Applied Stats Project 2, Dr. Turner, SMU
+# Authors: Antonio Debouse, Paul Huggins, Lijju Matthew
+# Thank you!
   
-  # Please see the below code and comments for Applied Stats Project 2, Dr. Turner, SMU
-  # Authors: Antonio Debouse, Paul Huggins, Lijju Matthew
-  # Thank you!
-  
-  ## Load libraries
-  ```{r}
+## Load libraries
+```{r}
 # Below are the required libraries for the project
 library(GGally)
 library(scales)
@@ -64,7 +64,8 @@ library(ggpubr)
 ## Load in dataset and look at data
 ```{r}
 # import data
-datain <- read.csv("https://raw.githubusercontent.com/lijjumathew/MSDS-Applied-Statistics-Project2/master/Bank_Additional%20_Full.csv", sep=",", header=TRUE)
+#datain <- read.csv("https://raw.githubusercontent.com/lijjumathew/MSDS-Applied-Statistics-Project2/master/Bank_Additional%20_Full.csv", sep=",", header=TRUE)
+datain <- read.csv("D:/MS Data Science/SMU/6372 - Applied Stats/Project 2/bank-additional-full.csv", header = TRUE)
 
 # View data
 str(datain)
@@ -102,8 +103,19 @@ datain$default <- as.factor(datain$default)
 datain$housing <- as.factor(datain$housing)
 datain$loan <- as.factor(datain$loan)
 datain$contact <- as.factor(datain$contact)
-datain$month <- sapply(datain$month,function(x) grep(paste("(?i)",x,sep=""),month.abb))
-datain$month <- as.factor(datain$month)
+datain$month <- dplyr::recode(datain$month, 
+                                    "jan"="1",
+                                    "feb"="2",
+                                    "mar"="3",
+                                    "apr"="4",
+                                    "may"="5",
+                                    "jun"="6",
+                                    "jul"="7",
+                                    "aug"="8",
+                                    "sep"="9",
+                                    "oct"="10",
+                                    "nov"="11",
+                                    "dec"="12")
 datain$day_of_week <- dplyr::recode(datain$day_of_week, 
                                     "mon"="1",
                                     "tue"="2",
@@ -963,8 +975,6 @@ train_bal_s_60$day_of_week <- as.numeric(train_bal_s_60$day_of_week)
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
-logit.os.Train$y <- as.factor(logit.os.Train$y)
-
 logit.os.Test <- test
 logit.os.Test$job <- as.numeric(logit.os.Test$job)
 logit.os.Test$marital <- as.numeric(logit.os.Test$marital)
@@ -976,6 +986,8 @@ logit.os.Test$month <- as.numeric(logit.os.Test$month)
 logit.os.Test$contact <- as.numeric(logit.os.Test$contact)
 logit.os.Test$poutcome <- as.numeric(logit.os.Test$poutcome)
 logit.os.Test$day_of_week <- as.numeric(logit.os.Test$day_of_week)
+
+logit.os.Train$y <- as.factor(logit.os.Train$y)
 
 # Analyzing interaction terms to determine ideal ones to put in the model
 # The ^2 runs the two way anova on all the variables
@@ -1043,6 +1055,7 @@ plot(step.osj2.log)
 
 ## Final Datasets to be used in the rest of the models
 ## Variables used determined by signficant variables defined by stepwise
+## LDA/QDA Data
 ```{r}
 set.seed(123)
 
@@ -1080,10 +1093,10 @@ l.BalanceIndex <- createDataPartition(lda.qda.data$y, p = .7,
                                       list = FALSE,
                                       times = 1)
 #Seperate all 4640 "yes" in dataset
-lY_data <- filter(lda.qda.data,grepl("2",y))
+lY_data <- filter(lda.qda.data,grepl("yes",y))
 
 #Seperate all "no's" in dataset
-lN_data <- filter(lda.qda.data,grepl("1", y))
+lN_data <- filter(lda.qda.data,grepl("no", y))
 
 #random sample 4640 no's from no-only dataset
 lN_data <- lN_data[sample(nrow(lN_data),4640),]
@@ -1120,10 +1133,10 @@ BalanceIndex <- createDataPartition(obj2.data$y, p = .7,
                                     list = FALSE,
                                     times = 1)
 #Seperate all 4640 "yes" in dataset
-Y_data <- filter(obj2.data,grepl("2",y))
+Y_data <- filter(obj2.data,grepl("yes",y))
 
 #Seperate all "no's" in dataset
-N_data <- filter(obj2.data,grepl("1",y))
+N_data <- filter(obj2.data,grepl("no",y))
 
 #random sample 4640 no's from no-only dataset
 N_data <- N_data[sample(nrow(N_data),4640),]
@@ -1142,6 +1155,56 @@ balanced.test$y <- as.factor(balanced.test$y)
 Roseindex <- sample(1:nrow(obj2.data), 0.7*nrow(obj2.data))  # row indices for training data
 rose.train <- ROSE(y ~ .,data = obj2.data[Roseindex, ])$data
 rose.test  <- obj2.data[-Roseindex, ]   # test data
+
+
+# Random Forest Data
+# Select transformations
+RF.DATA <- interpretation_data
+RF.DATA$pdays <- ifelse(RF.DATA$pdays == 999, -1, RF.DATA$pdays)
+
+rfdata <- RF.DATA
+rfdata  <- rfdata  %>%
+  select(age, job, marital, education, contact, month, day_of_week, campaign, pdays, previous,
+         poutcome, cons.price.idx, cons.conf.idx, y)
+
+rf.data.final <- rfdata 
+rf.data.final$month <- as.factor(rf.data.final$month)
+rf.data.final$y <- as.factor(rf.data.final$y)
+
+
+# Original Data Split
+RF.orig.index <- sample(1:nrow(rf.data.final), 0.7*nrow(rf.data.final))  # row indices for training data
+RF.orig.train <- rf.data.final[orig.index, ]  # model training data
+RF.orig.test  <- rf.data.final[-orig.index, ]   # test data
+
+# Balanced Data Set
+rf.BalanceIndex <- createDataPartition(rf.data.final$y, p = .7,
+                                    list = FALSE,
+                                    times = 1)
+#Seperate all 4640 "yes" in dataset
+RY_data <- filter(rf.data.final,grepl("yes",y))
+
+#Seperate all "no's" in dataset
+RN_data <- filter(rf.data.final,grepl("no",y))
+
+#random sample 4640 no's from no-only dataset
+RN_data <- RN_data[sample(nrow(RN_data),4640),]
+
+#Add the 4640 yes dataset with the random sampled 4640 no's dataset  
+RF.balanced_split_data <- rbind(RY_data,RN_data)
+RF.balanced_split_data$y <- as.factor(RF.balanced_split_data$y)
+
+RF.balanced.train <- RF.balanced_split_data
+RF.balanced.train$y <- as.factor(RF.balanced.train$y)
+RF.balanced.test <- rf.data.final[-rf.BalanceIndex,]
+RF.balanced.test$y <- as.factor(RF.balanced.test$y)
+
+# Rose Data
+RF.Roseindex <- sample(1:nrow(rf.data.final), 0.7*nrow(rf.data.final))  # row indices for training data
+RF.rose.train <- ROSE(y ~ .,data = rf.data.final[RF.Roseindex, ])$data
+RF.rose.test  <- rf.data.final[-RF.Roseindex, ]   # test data
+
+
 ```
 
 # --------------------------------------------------------
@@ -1555,13 +1618,12 @@ fda.r.spec
 ## RF with original
 ## Accuracy - 89.6%, Sensitivity - 98.7%, Specificity - 19.3%
 ```{r}
-
 set.seed(123)
 
 # Converting ‘y’ to a factor
-rf.o.train.data <- orig.train
+rf.o.train.data <- RF.orig.train
 rf.o.train.data$y <- factor(rf.o.train.data$y)
-rf.o.test.data <- orig.test
+rf.o.test.data <- RF.orig.test
 rf.o.test.data$y <- as.factor(rf.o.test.data$y)
 
 # set cross validation parameters
@@ -1572,7 +1634,7 @@ trControl <- trainControl(method = "cv",
 # Training using ‘random forest’ algorithm
 rf.o.model <- train(y~.,data = rf.o.train.data, method = "rf", 
                     metric = "Accuracy", importance = TRUE,
-                    trControl = trControl,  ntree = 50)
+                    trControl = trControl,  ntree = 12)
 
 print(rf.o.model)
 plot(rf.o.model)
@@ -1607,9 +1669,9 @@ rf.o.spec
 ```{r}
 set.seed(123)
 
-rf.b.train.data <- balanced.train
+rf.b.train.data <- RF.balanced.train
 rf.b.train.data$y <- factor(rf.b.train.data$y)
-rf.b.test.data <- balanced.test
+rf.b.test.data <- RF.balanced.test
 rf.b.test.data$y <- as.factor(rf.b.test.data$y)
 
 # set cross validation parameters
@@ -1620,7 +1682,7 @@ trControl <- trainControl(method = "cv",
 # Training using ‘random forest’ algorithm
 rf.b.model <- train(y~.,data = rf.b.train.data, method = "rf", 
                     metric = "Accuracy", importance = TRUE,
-                    trControl = trControl, ntree = 50)
+                    trControl = trControl, ntree = 24)
 
 print(rf.b.model)
 plot(rf.b.model)
@@ -1651,12 +1713,11 @@ rf.b.spec
 ## RF with rose
 ## Accuracy - 89.4%, Sensitivity - 98.0%, Specificity - 24.1%
 ```{r}
-
 set.seed(123)
 
-rf.r.train.data <- rose.train
+rf.r.train.data <- RF.rose.train
 rf.r.train.data$y <- factor(rf.r.train.data$y)
-rf.r.test.data <- rose.test
+rf.r.test.data <- RF.rose.test
 rf.r.test.data$y <- as.factor(rf.r.test.data$y)
 
 # set cross validation parameters
@@ -1667,7 +1728,7 @@ trControl <- trainControl(method = "cv",
 # Training using ‘random forest’ algorithm
 rf.r.model <- train(y~.,data = rf.r.train.data, method = "rf", 
                     metric = "Accuracy", importance = TRUE,
-                    trControl = trControl, ntree = 50)
+                    trControl = trControl, ntree = 20)
 
 print(rf.r.model)
 plot(rf.r.model)
@@ -1843,11 +1904,11 @@ cutoff<-0.5
 class.o.lasso<-factor(ifelse(fit.o.pred.lasso>cutoff,"2","1"))
 
 # Error
-lasso.o.error <- mean(lasso.o.test.data$y != class.o.lasso)
+lasso.o.error <- mean(as.numeric(lasso.o.test.data$y) != class.o.lasso)
 lasso.o.error
 
 # Confusion Matrix
-lasso.o.cm <- caret::confusionMatrix(as.factor(class.o.lasso), as.factor(lasso.o.test.data$y))
+lasso.o.cm <- caret::confusionMatrix(as.factor(class.o.lasso), as.factor(as.numeric(lasso.o.test.data$y)))
 lasso.o.cm
 
 # Model accuracy
@@ -1895,11 +1956,11 @@ cutoff<-0.5
 class.b.lasso<-factor(ifelse(fit.b.pred.lasso>cutoff,"2","1"))
 
 # Error
-lasso.b.error <- mean(lasso.b.test.data$y != class.b.lasso)
+lasso.b.error <- mean(as.numeric(lasso.b.test.data$y) != class.b.lasso)
 lasso.b.error
 
 # Confusion Matrix
-lasso.b.cm <- caret::confusionMatrix(as.factor(class.b.lasso), as.factor(lasso.b.test.data$y))
+lasso.b.cm <- caret::confusionMatrix(as.factor(class.b.lasso), as.factor(as.numeric(lasso.b.test.data$y)))
 lasso.b.cm
 
 # Model accuracy
@@ -1947,11 +2008,11 @@ cutoff<-0.5
 class.r.lasso<-factor(ifelse(fit.r.pred.lasso>cutoff,"2","1"))
 
 # Error
-lasso.r.error <- mean(lasso.r.test.data$y != class.r.lasso)
+lasso.r.error <- mean(as.numeric(lasso.r.test.data$y) != class.r.lasso)
 lasso.r.error
 
 # Confusion Matrix
-lasso.r.cm <- caret::confusionMatrix(as.factor(class.r.lasso), as.factor(lasso.r.test.data$y))
+lasso.r.cm <- caret::confusionMatrix(as.factor(class.r.lasso), as.factor(as.numeric(lasso.r.test.data$y)))
 lasso.r.cm
 
 # Model accuracy
@@ -2268,7 +2329,6 @@ as.datatable(formattable(accuracytbl, digits = 3,
 
 
 #EXTRA MODELS DEEMED UNNECESSARY
-
 ## RDA with original
 ## Accuracy - 89.6%, Sensitivity - 98.6%, Specificity - 20.1%
 ```{r}
