@@ -64,8 +64,8 @@ library(ggpubr)
 ## Load in dataset and look at data
 ```{r}
 # import data
-datain <- read.csv("D:/MS Data Science/SMU/6372 - Applied Stats/Project 2/bank-additional-full.csv", header = TRUE)
-#datain <- read.csv('/Users/lijjumathew/Library/Mobile Documents/com~apple~CloudDocs/Lijju/SMU/Courses/Applied Statistics/Project/Project2/bank-additional-full.csv', sep=";", header=TRUE)
+datain <- read.csv("https://raw.githubusercontent.com/lijjumathew/MSDS-Applied-Statistics-Project2/master/Bank_Additional%20_Full.csv", sep=",", header=TRUE)
+
 # View data
 str(datain)
 summary(datain)
@@ -128,6 +128,8 @@ set.seed(123)
 imputed = mice(datain, method=meth, predictorMatrix=predM, m=1)
 imputed <- complete(imputed)
 sapply(imputed, function(x) sum(is.na(x)))
+
+interpretation_data <- imputed
 
 # convert to numeric
 imputed$job <- as.numeric(imputed$job)
@@ -366,8 +368,9 @@ rtitle = "Summary Statistics Table for Continuious Variables Grouped by Yes/No R
 # Objective 1 - Simple Logistic Regression
 ## Logit - Data splitting
 ```{r}
-set.seed(123)
+set.seed(1234)
 ## Splitting and Down Sampling
+attach(imputed)
 dim(imputed)
 prop.table(table(imputed$y))
 imputed$y <- as.factor(imputed$y)
@@ -381,9 +384,11 @@ table(test$y)
 prop.table(table(test$y))
 
 # 60-40 down sampling
-train_bal_s_60 <- SMOTE(form = y~.,data = train, k = 5, perc.over = 390)
+library(DMwR)
+train_bal_s_60 <- DMwR::SMOTE(form = train$y ~ .,data = train, k = 5, perc.over = 390)
 table(train_bal_s_60$y)
 prop.table(table(train_bal_s_60$y))
+summary(train_bal_s_60)
 ```
 ## Logit - Full Model - SMOTE 60 - 40 Sampled
 ```{r}
@@ -845,6 +850,84 @@ auc5 <- auc5@y.values[[1]]
 auc5
 plot(prf5, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
+
+## Logit - Objective 1 Model - Interpretation (job,education,campaign,poutcome,nr.employed)
+```{r Objective1 model interpretation}
+
+set.seed(1234)
+## Splitting and Down Sampling
+interpretation_data$y <- as.factor(interpretation_data$y)
+training.samples <- interpretation_data$y %>%
+  createDataPartition(p = 0.7, list = FALSE)
+train <- interpretation_data[training.samples, ]
+test <- interpretation_data[-training.samples, ]
+
+# 60-40 down sampling
+library(DMwR)
+train_bal_s_60 <- DMwR::SMOTE(form = train$y ~ .,data = train, k = 5, perc.over = 390)
+table(train_bal_s_60$y)
+prop.table(table(train_bal_s_60$y))
+summary(train_bal_s_60)
+
+logit.os.Train <- train_bal_s_60
+summary(logit.os.Train)
+str(logit.os.Train)
+logit.os.Test <- test
+logit.os.Train$y <- as.factor(logit.os.Train$y)
+
+# Build Full Model
+red.mod6.log <- glm(y ~ job + education  +  campaign  + poutcome + nr.employed , family="binomial",data=logit.os.Train)
+
+# Step Model
+step.os6.log <- red.mod6.log %>% stepAIC(trace=FALSE)
+
+# Model Summary
+summary(step.os6.log)
+
+# Error Metrics
+step.os6.aic <- step.os.log$aic
+step.os6.aic
+
+# Confidence Intervals
+exp(cbind("Odds ratio" = coef(step.os6.log), confint.default(step.os6.log, level = 0.95)))
+
+# VIF Scores
+vif.6 <- vif(step.os6.log)
+vif.6.max <- max(vif.6)
+vif.6
+vif.6.max
+
+# Predictions & Accuracy
+fit.pred6.step<-predict(step.os6.log,newdata=logit.os.Test,type="response")
+cutoff<-0.5
+class.step6<-factor(ifelse(fit.pred6.step>cutoff,"yes","no"))
+print("Confusion matrix for Stepwise")
+obj1.mod6.cm <- confusionMatrix(as.factor(class.step6), logit.os.Test$y)
+
+obj1.mod6.acc <- obj1.mod6.cm$overall["Accuracy"]
+obj1.mod6.acc
+obj1.mod6.sens <- obj1.mod6.cm$byClass["Sensitivity"]
+obj1.mod6.sens
+obj1.mod6.spec <- obj1.mod6.cm$byClass["Specificity"]
+obj1.mod6.spec
+
+#MisCalc Rates
+obj1.mod6.msclc <- mean(class.step6 != logit.os.Test$y)
+print("Miscalculation Rate")
+obj1.mod6.msclc
+
+# Roc Curves & value
+p.6 <- predict(step.os6.log, newdata=logit.os.Test, type="response")
+pr.6 <- prediction(p.6, logit.os.Test$y)
+# TPR = sensitivity, FPR=specificity
+prf.6 <- performance(pr.6, measure = "tpr", x.measure = "fpr")
+auc.6 <- performance(pr.6, measure = "auc")
+auc.6 <- auc.6@y.values[[1]]
+auc.6
+plot(prf.6, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
+```
+
+
 
 # Objective 1 results table
 ```{r}
