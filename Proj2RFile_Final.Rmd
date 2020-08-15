@@ -1,16 +1,16 @@
 ---
-title: "R Notebook"
+  title: "R Notebook"
 output: html_notebook
 editor_options: 
   chunk_output_type: console
 ---
-
-# Please see the below code and comments for Applied Stats Project 2, Dr. Turner, SMU
-# Authors: Antonio Debouse, Paul Huggins, Lijju Matthew
-# Thank you!
-
-## Load libraries
-```{r}
+  
+  # Please see the below code and comments for Applied Stats Project 2, Dr. Turner, SMU
+  # Authors: Antonio Debouse, Paul Huggins, Lijju Matthew
+  # Thank you!
+  
+  ## Load libraries
+  ```{r}
 # Below are the required libraries for the project
 library(GGally)
 library(scales)
@@ -105,13 +105,13 @@ datain$contact <- as.factor(datain$contact)
 datain$month <- sapply(datain$month,function(x) grep(paste("(?i)",x,sep=""),month.abb))
 datain$month <- as.factor(datain$month)
 datain$day_of_week <- dplyr::recode(datain$day_of_week, 
-       "mon"="1",
-       "tue"="2",
-       "wed"="3",
-       "thu"="4",
-       "fri"="5",
-       "sat"="6",
-       "sun"="7")
+                                    "mon"="1",
+                                    "tue"="2",
+                                    "wed"="3",
+                                    "thu"="4",
+                                    "fri"="5",
+                                    "sat"="6",
+                                    "sun"="7")
 datain$day_of_week <- as.factor(datain$day_of_week)
 datain$poutcome <- as.factor(datain$poutcome)
 
@@ -191,16 +191,16 @@ pairs(EDAD_conti, pch=19)
 
 #Computing the p value of correlations
 cor.mtest <- function(mat, ...) {
-    mat <- as.matrix(mat)
-    n <- ncol(mat)
-    p.mat<- matrix(NA, n, n)
-    diag(p.mat) <- 0
-    for (i in 1:(n - 1)) {
-        for (j in (i + 1):n) {
-            tmp <- cor.test(mat[, i], mat[, j], ...)
-            p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
-        }
+  mat <- as.matrix(mat)
+  n <- ncol(mat)
+  p.mat<- matrix(NA, n, n)
+  diag(p.mat) <- 0
+  for (i in 1:(n - 1)) {
+    for (j in (i + 1):n) {
+      tmp <- cor.test(mat[, i], mat[, j], ...)
+      p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
     }
+  }
   colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
   p.mat
 }
@@ -280,11 +280,11 @@ library(qwraps2)
 options(qwraps2_markup = "markdown")
 imputed <- as.data.frame(imputed)
 continuous_vars <- select(imputed, c(age,duration,campaign,pdays,previous,emp.var.rate,cons.price.idx,cons.conf.idx,euribor3m,nr.employed,y)) #includes y variable (response var.)
- 
+
 continuous_vars <- as.data.frame(continuous_vars)
- 
- summary_statistics <-
-   list(
+
+summary_statistics <-
+  list(
     "Age" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(age,na_rm = FALSE),
@@ -297,61 +297,61 @@ continuous_vars <- as.data.frame(continuous_vars)
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(duration,na_rm = FALSE),
         "min" = ~min(duration, na.rm = FALSE),
         "max" = ~max(duration, na.rm = FALSE)),
-     "Campaign" =
+    "Campaign" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(campaign,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(campaign,na_rm = FALSE),
         "min" = ~min(campaign, na.rm = FALSE),
         "max" = ~max(campaign, na.rm = FALSE)),                
-     "Previous Days Since Contacted" =
+    "Previous Days Since Contacted" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(pdays,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(pdays,na_rm = FALSE),
         "min" = ~min(pdays, na.rm = FALSE),
         "max" = ~max(pdays, na.rm = FALSE)),                
-      "Previous # of contacts performed campaign" =
+    "Previous # of contacts performed campaign" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(previous,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(previous,na_rm = FALSE),
         "min" = ~min(previous, na.rm = FALSE),
         "max" = ~max(previous, na.rm = FALSE)),
-     "Employment Variation Rate" =
+    "Employment Variation Rate" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(emp.var.rate,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(emp.var.rate,na_rm = FALSE),
         "min" = ~min(emp.var.rate, na.rm = FALSE),
         "max" = ~max(emp.var.rate, na.rm = FALSE)),
-      "Consumer Price Index" =
+    "Consumer Price Index" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(cons.price.idx,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(cons.price.idx,na_rm = FALSE),
         "min" = ~min(cons.price.idx, na.rm = FALSE),
         "max" = ~max(cons.price.idx, na.rm = FALSE)),
-      "Consumer Confidence Index" =
+    "Consumer Confidence Index" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(cons.conf.idx,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(cons.conf.idx,na_rm = FALSE),
         "min" = ~min(cons.conf.idx, na.rm = FALSE),
         "max" = ~max(cons.conf.idx, na.rm = FALSE)),
-      "Euribor 3-Month Rate" =
+    "Euribor 3-Month Rate" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(euribor3m,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(euribor3m,na_rm = FALSE),
         "min" = ~min(euribor3m, na.rm = FALSE),
         "max" = ~max(euribor3m, na.rm = FALSE)),
-      "Number of Employees" =
+    "Number of Employees" =
       list(
         "mean (sd)" = ~ qwraps2::mean_sd(nr.employed,na_rm = FALSE),
         "median (Q1, Q3)" = ~  qwraps2::median_iqr(nr.employed,na_rm = FALSE),
         "min" = ~min(nr.employed, na.rm = FALSE),
         "max" = ~max(nr.employed, na.rm = FALSE))
-    )
+  )
 
 #View summary stats grouped by Yes/No
 print(qwraps2::summary_table(
   dplyr::group_by(continuous_vars,y),
   summary_statistics),
-rtitle = "Summary Statistics Table for Continuious Variables Grouped by Yes/No Responses")
+  rtitle = "Summary Statistics Table for Continuious Variables Grouped by Yes/No Responses")
 
 ##pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
 ##emp.var.rate: employment variation rate - quarterly indicator (numeric)
@@ -425,7 +425,7 @@ step.os.logit.acc
 
 1. Using SMOTE 60-40 sampled data as the train data
 2. From the full model and the significant predictors from step wise model and taking into account the correlated predictors
-   below are the some of the models.
+below are the some of the models.
 
 ## Logit - Reduced Model 6(job,education,campaign,poutcome,nr.employed)
 ## Accuracy - 80.7%, Sensitivity - 83.7, Specificity - 57.0, MC - 0.1927, AUC - 0.7387
@@ -903,6 +903,7 @@ cutoff<-0.5
 class.step6<-factor(ifelse(fit.pred6.step>cutoff,"yes","no"))
 print("Confusion matrix for Stepwise")
 obj1.mod6.cm <- confusionMatrix(as.factor(class.step6), logit.os.Test$y)
+obj1.mod6.cm
 
 obj1.mod6.acc <- obj1.mod6.cm$overall["Accuracy"]
 obj1.mod6.acc
@@ -926,7 +927,6 @@ auc.6 <- auc.6@y.values[[1]]
 auc.6
 plot(prf.6, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
-
 # Model 6 is the best model given the specifity value
 
 # -----------------------------------------------------------------------------
@@ -949,11 +949,33 @@ summary(res.aov2)
 ```{r Objective 1 complex model}
 set.seed(123)
 
+train_bal_s_60$job <- as.numeric(train_bal_s_60$job)
+train_bal_s_60$marital <- as.numeric(train_bal_s_60$marital)
+train_bal_s_60$education <- as.numeric(train_bal_s_60$education)
+train_bal_s_60$default <- as.numeric(train_bal_s_60$default)
+train_bal_s_60$housing <- as.numeric(train_bal_s_60$housing)
+train_bal_s_60$loan <- as.numeric(train_bal_s_60$loan)
+train_bal_s_60$month <- as.numeric(train_bal_s_60$month)
+train_bal_s_60$contact <- as.numeric(train_bal_s_60$contact)
+train_bal_s_60$poutcome <- as.numeric(train_bal_s_60$poutcome)
+train_bal_s_60$day_of_week <- as.numeric(train_bal_s_60$day_of_week)
+
 logit.os.Train <- train_bal_s_60
 summary(logit.os.Train)
 str(logit.os.Train)
-logit.os.Test <- test
 logit.os.Train$y <- as.factor(logit.os.Train$y)
+
+logit.os.Test <- test
+logit.os.Test$job <- as.numeric(logit.os.Test$job)
+logit.os.Test$marital <- as.numeric(logit.os.Test$marital)
+logit.os.Test$education <- as.numeric(logit.os.Test$education)
+logit.os.Test$default <- as.numeric(logit.os.Test$default)
+logit.os.Test$housing <- as.numeric(logit.os.Test$housing)
+logit.os.Test$loan <- as.numeric(logit.os.Test$loan)
+logit.os.Test$month <- as.numeric(logit.os.Test$month)
+logit.os.Test$contact <- as.numeric(logit.os.Test$contact)
+logit.os.Test$poutcome <- as.numeric(logit.os.Test$poutcome)
+logit.os.Test$day_of_week <- as.numeric(logit.os.Test$day_of_week)
 
 # Analyzing interaction terms to determine ideal ones to put in the model
 # The ^2 runs the two way anova on all the variables
@@ -979,7 +1001,7 @@ step.osj2.aic
 exp(cbind("Odds ratio" = coef(step.osj2.log), confint.default(step.osj2.log, level = 0.95)))
 
 # VIF Scores
-vif.osj2 <- vif(step.osj2.)
+vif.osj2.log <- vif(step.osj2.log)
 
 # Predictions & Accuracy
 fit.pred.step.oj2 <-predict(step.osj2.log,newdata=logit.os.Test,type="response")
@@ -1055,8 +1077,8 @@ lqda.orig.test  <- lda.qda.data[-lqda.orig.index, ]   # test data
 
 # Balanced Data Set
 l.BalanceIndex <- createDataPartition(lda.qda.data$y, p = .7,
-                                  list = FALSE,
-                                  times = 1)
+                                      list = FALSE,
+                                      times = 1)
 #Seperate all 4640 "yes" in dataset
 lY_data <- filter(lda.qda.data,grepl("2",y))
 
@@ -1095,8 +1117,8 @@ orig.test  <- obj2.data[-orig.index, ]   # test data
 
 # Balanced Data Set
 BalanceIndex <- createDataPartition(obj2.data$y, p = .7,
-                                  list = FALSE,
-                                  times = 1)
+                                    list = FALSE,
+                                    times = 1)
 #Seperate all 4640 "yes" in dataset
 Y_data <- filter(obj2.data,grepl("2",y))
 
@@ -1544,8 +1566,8 @@ rf.o.test.data$y <- as.factor(rf.o.test.data$y)
 
 # set cross validation parameters
 trControl <- trainControl(method = "cv",
-    number = 10,
-    search = "grid")
+                          number = 10,
+                          search = "grid")
 
 # Training using ‘random forest’ algorithm
 rf.o.model <- train(y~.,data = rf.o.train.data, method = "rf", 
@@ -1592,8 +1614,8 @@ rf.b.test.data$y <- as.factor(rf.b.test.data$y)
 
 # set cross validation parameters
 trControl <- trainControl(method = "cv",
-    number = 10,
-    search = "grid")
+                          number = 10,
+                          search = "grid")
 
 # Training using ‘random forest’ algorithm
 rf.b.model <- train(y~.,data = rf.b.train.data, method = "rf", 
@@ -1639,8 +1661,8 @@ rf.r.test.data$y <- as.factor(rf.r.test.data$y)
 
 # set cross validation parameters
 trControl <- trainControl(method = "cv",
-    number = 10,
-    search = "grid")
+                          number = 10,
+                          search = "grid")
 
 # Training using ‘random forest’ algorithm
 rf.r.model <- train(y~.,data = rf.r.train.data, method = "rf", 
@@ -1970,18 +1992,18 @@ y_test = net.o.test$y
 
 # Set training control
 train_cont <- trainControl(method = "repeatedcv",
-                              number = 10,
-                              repeats = 1,
-                              search = "random",
-                              verboseIter = TRUE)
+                           number = 10,
+                           repeats = 1,
+                           search = "random",
+                           verboseIter = TRUE)
 
 # Train the model
 elastic_reg <- train(y ~ .,
-                           data = net.o.train,
-                           method = "glmnet",
-                           preProcess = c("center", "scale"),
-                           tuneLength = 10,
-                           trControl = train_cont)
+                     data = net.o.train,
+                     method = "glmnet",
+                     preProcess = c("center", "scale"),
+                     tuneLength = 10,
+                     trControl = train_cont)
 
 
 # Best tuning parameter
@@ -2033,18 +2055,18 @@ y_test = net.b.test$y
 
 # Set training control
 train_cont <- trainControl(method = "repeatedcv",
-                              number = 10,
-                              repeats = 1,
-                              search = "random",
-                              verboseIter = TRUE)
+                           number = 10,
+                           repeats = 1,
+                           search = "random",
+                           verboseIter = TRUE)
 
 # Train the model
 elastic_reg <- train(y ~ .,
-                           data = net.b.train,
-                           method = "glmnet",
-                           preProcess = c("center", "scale"),
-                           tuneLength = 10,
-                           trControl = train_cont)
+                     data = net.b.train,
+                     method = "glmnet",
+                     preProcess = c("center", "scale"),
+                     tuneLength = 10,
+                     trControl = train_cont)
 
 
 # Best tuning parameter
@@ -2098,18 +2120,18 @@ y_test = net.r.test$y
 
 # Set training control
 train_cont <- trainControl(method = "repeatedcv",
-                              number = 10,
-                              repeats = 1,
-                              search = "random",
-                              verboseIter = TRUE)
+                           number = 10,
+                           repeats = 1,
+                           search = "random",
+                           verboseIter = TRUE)
 
 # Train the model
 elastic_reg <- train(y ~ .,
-                           data = net.r.train,
-                           method = "glmnet",
-                           preProcess = c("center", "scale"),
-                           tuneLength = 10,
-                           trControl = train_cont)
+                     data = net.r.train,
+                     method = "glmnet",
+                     preProcess = c("center", "scale"),
+                     tuneLength = 10,
+                     trControl = train_cont)
 
 
 # Best tuning parameter
@@ -2167,15 +2189,15 @@ customRed = "#ff7f7f"
 
 options(digits = 3)
 as.datatable(formattable(accuracytbl,align = c("l",rep("r", NCOL(accuracytbl) - 1)),
-            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
-                 'Accuracy' = percent, 
-                 'Sensitivity' = percent,
-                 'Specificity' = percent,
-                 'Error Rate' = percent,
-                 'Accuracy' = color_text(customRed, customGreen),
-                 'Sensitivity' = color_text(customRed, customGreen),
-                 "Specificity" = color_text(customRed, customGreen),
-                 'Error Rate' = color_text(customGreen, customRed)))
+                         list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
+                              'Accuracy' = percent, 
+                              'Sensitivity' = percent,
+                              'Specificity' = percent,
+                              'Error Rate' = percent,
+                              'Accuracy' = color_text(customRed, customGreen),
+                              'Sensitivity' = color_text(customRed, customGreen),
+                              "Specificity" = color_text(customRed, customGreen),
+                              'Error Rate' = color_text(customGreen, customRed)))
 )
 ```
 
@@ -2228,15 +2250,15 @@ customGreen = "#009900"
 customRed = "#ff7f7f"
 
 as.datatable(formattable(accuracytbl, digits = 3,
-            align = c("l",rep("r", NCOL(accuracytbl) - 1)),
-            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
-                 'Accuracy' = percent, 
-                 'Sensitivity' = percent,
-                 'Specificity' = percent,
-                 'Accuracy' = color_text(customRed, customGreen),
-                 'Sensitivity' = color_text(customRed, customGreen),
-                 "Specificity" = color_text(customRed, customGreen),
-                 "ErrorRate" = color_text(customGreen, customRed)))
+                         align = c("l",rep("r", NCOL(accuracytbl) - 1)),
+                         list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
+                              'Accuracy' = percent, 
+                              'Sensitivity' = percent,
+                              'Specificity' = percent,
+                              'Accuracy' = color_text(customRed, customGreen),
+                              'Sensitivity' = color_text(customRed, customGreen),
+                              "Specificity" = color_text(customRed, customGreen),
+                              "ErrorRate" = color_text(customGreen, customRed)))
 )
 ```
 
