@@ -927,47 +927,6 @@ auc.6
 plot(prf.6, main = paste("ROC Curve  \n AUC = ", auc), col = "blue")
 ```
 
-
-
-# Objective 1 results table
-```{r}
-step.os6.res <- cbind("Model 6",obj1.mod6.acc, obj1.mod6.sens, obj1.mod6.spec, vif.6.max, obj1.mod6.msclc, auc.6)
-step.os1.res <- cbind("Model 1",obj1.mod1.acc, obj1.mod1.sens, obj1.mod1.spec, vif.1.max, obj1.mod1.msclc, auc1)
-step.os2.res <- cbind("Model 2",obj1.mod2.acc, obj1.mod2.sens, obj1.mod2.spec, vif.2.max, obj1.mod2.msclc, auc2)
-step.os4.res <- cbind("Model 4",obj1.mod4.acc, obj1.mod4.sens, obj1.mod4.spec, vif.4.max, obj1.mod4.msclc, auc4)
-step.os7.res <- cbind("Model 7",obj1.mod7.acc, obj1.mod7.sens, obj1.mod7.spec, vif.7.max, obj1.mod7.msclc, auc7)
-step.os3.res <- cbind("Model 3",obj1.mod3.acc, obj1.mod3.sens, obj1.mod3.spec, vif.3.max, obj1.mod3.msclc, auc3)
-step.os5.res <- cbind("Model 5",obj1.mod5.acc, obj1.mod5.sens, obj1.mod5.spec, vif.5.max, obj1.mod5.msclc, auc5)
-
-
-accuracy1 <- rbind(step.os6.res, step.os1.res, step.os2.res, step.os4.res, step.os7.res, step.os3.res, step.os5.res)
-
-colnames(accuracy1) <- c("Method", "Accuracy", "Sensitivity", "Specificity", "LargestVIF" , "MiscalcRate", "AUCROC")
-
-accuracytbl1 <- as.data.frame(accuracy1)
-accuracytbl1$Accuracy <- as.numeric(accuracytbl1$Accuracy)
-accuracytbl1$Sensitivity <- as.numeric(accuracytbl1$Sensitivity)
-accuracytbl1$Specificity <- as.numeric(accuracytbl1$Specificity)
-accuracytbl1$LargestVIF <- as.numeric(accuracytbl1$LargestVIF)
-accuracytbl1$MiscalcRate <- as.numeric(accuracytbl1$MiscalcRate)
-accuracytbl1$AUCROC <- as.numeric(accuracytbl1$AUCROC)
-
-
-# Neat table
-customGreen = "#009900"
-customRed = "#ff7f7f"
-
-options(digits = 3)
-as.datatable(formattable(accuracytbl1,align = c("l",rep("r", NCOL(accuracytbl1) - 1)),
-            list(`Method` = formatter("span", style = ~ style(color = "black", font.weight = "bold")), 
-                 'Accuracy' = color_text(customRed, customGreen),
-                 'Sensitivity' = color_text(customRed, customGreen),
-                 "Specificity" = color_text(customRed, customGreen),
-                 'MiscalcRate' = color_text(customGreen, customRed),
-                 'LargestVIF' = color_text(customGreen, customRed),
-                 "AUCROC" = color_text(customRed, customGreen)))
-)
-```
 # Model 6 is the best model given the specifity value
 
 # -----------------------------------------------------------------------------
